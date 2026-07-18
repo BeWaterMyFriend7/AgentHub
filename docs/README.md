@@ -11,7 +11,7 @@
 | `quality/` | 业务怎样验收、技术怎样测试、某次验证结果如何 | `bdd/`、`testing.md`、`verification/` |
 | `process/` | 下一步做什么、当前待办、已经学到什么 | `roadmap.md`、`todo.md`、`learnings.md` |
 | `guides/` | 如何操作、开发和维护 | `skill-bridge-operations.md` |
-| `prototypes/` | 非生产 UI 和技术实验 | `agent_hub_prototype_v3.html` |
+| `prototypes/` | 非生产 UI 和技术实验 | `agent-hub-v1.md`、`agent_hub_prototype_v3.html` |
 
 ## 文档职责
 

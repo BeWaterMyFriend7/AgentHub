@@ -14,9 +14,10 @@
 
 ## 阶段 2：真实会话接入
 
-- 优先实现一个 Server/API 型 Agent Adapter。
-- 再实现一个 Hook/本地数据型 Agent Adapter。
-- 完成会话发现、状态映射、待处理和精确恢复验收。
+- 完成首批 Agent 候选接入方式调研，具体对象和验证项以 [`todo.md`](./todo.md#会话接入) 为准。
+- 优先实现一个 Server/API 型 Agent Adapter，再实现一个 Hook/本地数据型 Agent Adapter。
+- 完成会话发现、独立状态映射、待处理自动解除、规划透传和精确恢复验收。
+- 至少两个 Agent 必须通过“同一 Agent 多会话独立展示并能按原生 ID 精确恢复”的真实验证，才能完成本阶段。
 
 ## 阶段 3：整合 Skill 管理
 

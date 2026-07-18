@@ -7,6 +7,16 @@
 - [ ] 将 SkillBridge 的成熟领域逻辑合并为 AgentHub 内部 Skill 模块。
 - [ ] 建立 Windows、macOS、Linux 平台文件链接适配接口。
 
+## 会话接入
+
+- [ ] 验证 OpenCode 是否能通过稳定 Server/API 列出多个会话、读取状态和 Todo，并按会话 ID 打开。
+- [ ] 验证 Codex 是否提供稳定 Thread ID、权限与轮次事件，以及按 Thread 精确恢复能力。
+- [ ] 验证 Claude Code Hooks 能否可靠上报权限、输入、停止和失败事件，并按 Session ID 恢复。
+- [ ] 定义 Agent Adapter 的会话发现、状态、规划、事件、探测、恢复和接入等级契约。
+- [ ] 为统一会话模型增加运行状态、关注状态、状态来源、可信度和恢复方式。
+- [ ] 建立完整接入、部分接入、有限接入的验证夹具，确保进程或窗口探测不进入核心会话统计。
+- [ ] 至少完成两个 Agent 的多会话独立状态与精确恢复验证，并把证据保存到 `docs/quality/verification/`。
+
 ## 能力管理
 
 - [ ] 从 `src/skill_bridge/` 提取可复用的 Skill 领域逻辑。

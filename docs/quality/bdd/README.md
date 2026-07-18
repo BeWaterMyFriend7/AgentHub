@@ -21,7 +21,8 @@
 
 ## 当前 Feature
 
-- `session-observation.feature`：内部会话发现、待处理识别和精确恢复。
+- `session-observation.feature`：内部会话发现、统计、规划展示、会话接入等级和精确恢复。
+- `session-attention.feature`：待处理识别、自动解除、验收边界和状态可信度。
 - `skill-safe-sharing.feature`：Skill 共享、备份、取消和失败恢复。
 - `capability-folder-sharing.feature`：Skill、MCP、插件的跨平台目录同源共享。
 - `capability-source-deletion.feature`：普通卸载、来源删除和永久清除的安全边界。
