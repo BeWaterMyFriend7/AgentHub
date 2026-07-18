@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}SkillBridge{% endblock %}
+{% block content %}
+<div class="toolbar">
+    <input type="text" id="searchInput" placeholder="搜索 Skill..." oninput="filterSkills()">
+    <select id="stateFilter" onchange="filterSkills()">
+        <option value="">全部状态</option>
+        <option value="MISSING">未启用</option>
+        <option value="SHARED_LINK">已共享</option>
+        <option value="CONFLICT">冲突</option>
+        <option value="BROKEN_LINK">断链</option>
+        <option value="LOCAL_COPY">本地副本</option>
+    </select>
+    <button class="btn btn-primary" onclick="rescan()">重新扫描</button>
+    <a href="/settings" class="btn">Agent 设置</a>
+    <span style="color: #999; font-size: 13px; margin-left: 8px;" id="batchInfo"></span>
+    <span id="batchActions" style="display:none; margin-left: 8px;">
+        {% for agent in matrix.agents %}
+        <button class="btn btn-primary" style="font-size: 12px;" onclick="batchShare('{{ agent.id }}')">共享给 {{ agent_icon(agent.icon) }}{{ agent.name }}</button>
+        {% endfor %}
+        <button class="btn btn-danger" style="font-size: 12px;" onclick="batchUnshare()">取消共享</button>
+        <button class="btn" style="font-size: 12px;" onclick="clearSelection()">取消选择</button>
+    </span>
+</div>
+
+<div class="matrix">
+    <table class="matrix-table" id="matrixTable">
+        <thead>
+            <tr>
+                <th style="width: 32px;"><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                <th>Skill</th>
+                {% for agent in matrix.agents %}
+                <th class="agent-col">{{ agent_icon(agent.icon) }} {{ agent.name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for skill in matrix.skills %}
+            <tr class="skill-row" data-name="{{ skill.skill_name.lower() }}">
+                <td><input type="checkbox" class="skill-check" value="{{ skill.skill_name }}" onchange="updateBatchUI()"></td>
+                <td>
+                    <a href="/skills/{{ skill.skill_name }}" class="skill-name">{{ skill.skill_name }}</a>
+                    {% if skill.description %}
+                    <div class="skill-desc">{{ skill.description }}</div>
+                    {% endif %}
+                </td>
+                {% for agent in matrix.agents %}
+                {% set instance = skill.instances_by_agent.get(agent.id) %}
+                <td>
+                    {% if instance %}
+                    <button class="state-btn {{ state_class(instance.state.value) }}"
+                            onclick="handleStateClick('{{ skill.skill_name }}', '{{ agent.id }}', '{{ instance.state.value }}')"
+                            data-state="{{ instance.state.value }}">
+                        {{ state_icon(instance.state.value) }} {{ state_label(instance.state.value) }}
+                    </button>
+                    {% else %}
+                    <span class="state-btn state-missing">-</span>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{{ matrix.agents|length + 2 }}">
+                    <div class="empty-state">
+                        {% if matrix.agents %}
+                        暂无 Skill 数据，请点击"重新扫描"。
+                        {% else %}
+                        暂无 Agent 配置，请先到 <a href="/settings">Agent 设置</a> 添加。
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+        <h3 id="modalTitle">确认操作</h3>
+        <p id="modalMessage">确定要执行此操作吗？</p>
+        <div class="modal-actions">
+            <button class="btn" onclick="closeModal()">取消</button>
+            <button class="btn btn-danger" id="modalConfirmBtn" onclick="executeAction()">确定</button>
+        </div>
+    </div>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <p id="loadingText">操作中...</p>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let pendingAction = null;
+
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || '操作中...';
+    document.getElementById('loadingOverlay').classList.add('active');
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function apiFetch(url, options) {
+    if (!options.headers) options.headers = {};
+    options.headers['X-Session-Token'] = SESSION_TOKEN;
+    return fetch(url, options);
+}
+
+function filterSkills() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const stateFilter = document.getElementById('stateFilter').value;
+    document.querySelectorAll('.skill-row').forEach(row => {
+        const name = row.dataset.name;
+        let show = !search || name.includes(search);
+        if (show && stateFilter) {
+            let hasState = false;
+            row.querySelectorAll('.state-btn').forEach(btn => {
+                if (btn.dataset.state === stateFilter) hasState = true;
+            });
+            show = hasState;
+        }
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show toast-' + type;
+    setTimeout(() => toast.className = 'toast', 3000);
+}
+
+function closeModal() {
+    document.getElementById('confirmModal').classList.remove('active');
+    pendingAction = null;
+}
+
+function toggleAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.skill-check').forEach(cb => cb.checked = checked);
+    updateBatchUI();
+}
+
+function updateBatchUI() {
+    const checked = document.querySelectorAll('.skill-check:checked');
+    const count = checked.length;
+    document.getElementById('batchInfo').textContent = count > 0 ? '已选 ' + count + ' 个 Skill' : '';
+    document.getElementById('batchActions').style.display = count > 0 ? 'inline' : 'none';
+}
+
+function clearSelection() {
+    document.querySelectorAll('.skill-check').forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBatchUI();
+}
+
+function getSelectedSkills() {
+    return Array.from(document.querySelectorAll('.skill-check:checked')).map(cb => cb.value);
+}
+
+function handleStateClick(skillName, agentId, state) {
+    if (state === 'SOURCE_LOCAL') {
+        showToast('源目录不可直接操作', 'error');
+        return;
+    }
+    if (state === 'SHARED_LINK') {
+        document.getElementById('modalTitle').textContent = '取消共享';
+        document.getElementById('modalMessage').textContent = '确定要取消 "' + skillName + '" 在 "' + agentId + '" 的共享吗？源目录不会被删除。';
+        document.getElementById('modalConfirmBtn').className = 'btn btn-danger';
+        document.getElementById('modalConfirmBtn').textContent = '取消共享';
+        pendingAction = { action: 'disable', skillName: skillName, agentId: agentId };
+        document.getElementById('confirmModal').classList.add('active');
+        return;
+    }
+    if (state === 'MISSING') {
+        document.getElementById('modalTitle').textContent = '启用共享';
+        document.getElementById('modalMessage').textContent = '确定为 "' + agentId + '" 启用 "' + skillName + '" 的共享？将在目标目录创建 Junction。';
+        document.getElementById('modalConfirmBtn').className = 'btn btn-primary';
+        document.getElementById('modalConfirmBtn').textContent = '启用共享';
+        pendingAction = { action: 'enable', skillName: skillName, agentId: agentId };
+        document.getElementById('confirmModal').classList.add('active');
+        return;
+    }
+    if (state === 'CONFLICT') {
+        window.location.href = '/skills/' + encodeURIComponent(skillName);
+        return;
+    }
+    if (state === 'BROKEN_LINK') {
+        document.getElementById('modalTitle').textContent = '修复断链';
+        document.getElementById('modalMessage').textContent = '"' + skillName + '" 在 "' + agentId + '" 的链接已断开。删除断链？';
+        pendingAction = { action: 'disable', skillName: skillName, agentId: agentId };
+        document.getElementById('modalConfirmBtn').className = 'btn btn-danger';
+        document.getElementById('modalConfirmBtn').textContent = '删除断链';
+        document.getElementById('confirmModal').classList.add('active');
+        return;
+    }
+    if (state === 'LOCAL_COPY') {
+        document.getElementById('modalTitle').textContent = '本地副本';
+        document.getElementById('modalMessage').textContent = '"' + skillName + '" 在 "' + agentId + '" 是本地副本。备份后转为共享？';
+        document.getElementById('modalConfirmBtn').className = 'btn btn-primary';
+        document.getElementById('modalConfirmBtn').textContent = '备份并共享';
+        pendingAction = { action: 'enable', skillName: skillName, agentId: agentId };
+        document.getElementById('confirmModal').classList.add('active');
+        return;
+    }
+    window.location.href = '/skills/' + encodeURIComponent(skillName);
+}
+
+async function executeAction() {
+    if (!pendingAction) return;
+    const { action, skillName, agentId } = pendingAction;
+    closeModal();
+    showLoading(action === 'enable' ? '正在共享...' : '正在取消共享...');
+    try {
+        let url, options;
+        if (action === 'enable') {
+            url = '/api/skills/' + encodeURIComponent(skillName) + '/share';
+            options = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_id: agentId }) };
+        } else {
+            url = '/api/skills/' + encodeURIComponent(skillName) + '/share/' + encodeURIComponent(agentId);
+            options = { method: 'DELETE' };
+        }
+        const resp = await apiFetch(url, options);
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            hideLoading();
+            showToast('服务器异常 (' + resp.status + ')，但操作可能已成功', 'error');
+            return;
+        }
+        hideLoading();
+        if (data.success) {
+            showToast(data.message || '操作成功', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast(data.error || '操作失败', 'error');
+        }
+    } catch (e) {
+        hideLoading();
+        showToast('网络错误: ' + e.message, 'error');
+    }
+}
+
+async function batchShare(agentId) {
+    const skills = getSelectedSkills();
+    if (!skills.length) return;
+    const skillList = skills.join(', ');
+    if (!confirm('确定为 ' + agentId + ' 启用以下 Skill 的共享？\n' + skillList)) return;
+    showLoading('批量共享中...');
+    try {
+        const resp = await apiFetch('/api/skills/batch/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skill_names: skills, agent_id: agentId })
+        });
+        let data;
+        try { data = await resp.json(); } catch (e) { data = null; }
+        hideLoading();
+        if (data && data.success) {
+            const ok = data.results.filter(r => r.success).length;
+            const fail = data.results.filter(r => !r.success).length;
+            showToast('完成: ' + ok + ' 成功, ' + fail + ' 失败', fail > 0 ? 'error' : 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('服务器异常 (' + resp.status + ')，部分可能已成功', 'error');
+        }
+    } catch (e) {
+        hideLoading();
+        showToast('错误: ' + e.message, 'error');
+    }
+}
+
+async function batchUnshare() {
+    const skills = getSelectedSkills();
+    if (!skills.length) return;
+    if (!confirm('确定为选中的 ' + skills.length + ' 个 Skill 取消共享？')) return;
+    const agentId = prompt('输入要取消共享的 Agent ID:');
+    if (!agentId) return;
+    showLoading('批量取消共享中...');
+    try {
+        const resp = await apiFetch('/api/skills/batch/unshare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skill_names: skills, agent_id: agentId })
+        });
+        let data;
+        try { data = await resp.json(); } catch (e) { data = null; }
+        hideLoading();
+        if (data && data.success) {
+            const ok = data.results.filter(r => r.success).length;
+            const fail = data.results.filter(r => !r.success).length;
+            showToast('完成: ' + ok + ' 成功, ' + fail + ' 失败', fail > 0 ? 'error' : 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('服务器异常 (' + resp.status + ')，部分可能已成功', 'error');
+        }
+    } catch (e) {
+        hideLoading();
+        showToast('错误: ' + e.message, 'error');
+    }
+}
+
+async function rescan() {
+    showLoading('正在扫描...');
+    try {
+        const resp = await apiFetch('/api/scan', { method: 'POST' });
+        let data;
+        try { data = await resp.json(); } catch (e) { data = null; }
+        hideLoading();
+        if (data && data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('扫描异常 (' + resp.status + ')，请检查配置', 'error');
+        }
+    } catch (e) {
+        hideLoading();
+        showToast('扫描失败: ' + e.message, 'error');
+    }
+}
+</script>
+{% endblock %}

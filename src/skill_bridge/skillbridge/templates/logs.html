@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}操作记录{% endblock %}
+{% block content %}
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <p id="loadingText">操作中...</p>
+    </div>
+</div>
+<h2 style="margin-bottom: 16px;">操作记录</h2>
+
+<table class="log-table">
+    <thead>
+        <tr>
+            <th>时间</th>
+            <th>操作</th>
+            <th>Skill</th>
+            <th>Agent</th>
+            <th>状态</th>
+            <th>详情</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for op in operations %}
+        {% set status_map = {"SUCCESS":"成功","FAILED":"失败","IN_PROGRESS":"进行中","ROLLED_BACK":"已回滚","PENDING":"等待中"} %}
+        {% set action_map = {"ENABLE_SHARE":"启用共享","DISABLE_SHARE":"取消共享"} %}
+        <tr>
+            <td style="white-space: nowrap;">{{ op.created_at[:19] }}</td>
+            <td>{{ action_map.get(op.action, op.action) }}</td>
+            <td>{{ op.skill_name }}</td>
+            <td>{{ op.agent_id }}</td>
+            <td><span class="status-badge status-{{ op.status.lower() }}">{{ status_map.get(op.status, op.status) }}</span></td>
+            <td class="log-detail">
+                {% if op.details is mapping %}
+                    {% if op.details.get("source") %}
+                    <div class="log-path">源: {{ op.details.source[:60] }}{% if op.details.source|length > 60 %}...{% endif %}</div>
+                    {% endif %}
+                    {% if op.details.get("target") %}
+                    <div class="log-path">目标: {{ op.details.target[:60] }}{% if op.details.target|length > 60 %}...{% endif %}</div>
+                    {% endif %}
+                {% endif %}
+                {% if op.error %}
+                <div class="log-error">{{ op.error[:80] }}{% if op.error|length > 80 %}...{% endif %}</div>
+                {% endif %}
+                {% if op.backup_path %}
+                <div class="log-path">备份: {{ op.backup_path[:60] }}{% if op.backup_path|length > 60 %}...{% endif %}</div>
+                {% endif %}
+            </td>
+            <td>
+                {% if op.status == 'SUCCESS' and op.action in ('ENABLE_SHARE', 'DISABLE_SHARE') %}
+                <button class="btn btn-sm" onclick="rollback({{ op.id }})">回滚</button>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="7"><div class="empty-state">暂无操作记录</div></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || '操作中...';
+    document.getElementById('loadingOverlay').classList.add('active');
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function apiFetch(url, options) {
+    if (!options) options = {};
+    if (!options.headers) options.headers = {};
+    options.headers['X-Session-Token'] = SESSION_TOKEN;
+    return fetch(url, options);
+}
+
+function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show toast-' + type;
+    setTimeout(() => toast.className = 'toast', 3000);
+}
+
+async function rollback(opId) {
+    if (!confirm('确定回滚此操作？')) return;
+    showLoading('正在回滚...');
+    try {
+        const resp = await apiFetch('/api/operations/' + opId + '/rollback', { method: 'POST' });
+        let data;
+        try {
+            data = await resp.json();
+        } catch (e) {
+            hideLoading();
+            showToast('服务器返回异常: ' + resp.status, 'error');
+            return;
+        }
+        hideLoading();
+        if (data.success) {
+            showToast(data.message || '回滚成功', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast(data.error || '回滚失败', 'error');
+        }
+    } catch (e) {
+        hideLoading();
+        showToast('网络错误: ' + e.message, 'error');
+    }
+}
+</script>
+{% endblock %}

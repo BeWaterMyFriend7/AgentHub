@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SkillBridge{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>var SESSION_TOKEN = "{{ session_token }}";</script>
+<script>document.querySelectorAll('.nav-link').forEach(function(a){ if (a.pathname === location.pathname) a.classList.add('active'); });</script>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-brand">SkillBridge</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Skill 总览</a>
+                <a href="/settings" class="nav-link">Agent 设置</a>
+                <a href="/logs" class="nav-link">操作记录</a>
+            </div>
+        </div>
+    </nav>
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

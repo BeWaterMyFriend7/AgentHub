@@ -1,0 +1,17 @@
+{
+  "mode": "demo",
+  "tools": [
+    {
+      "id": "codex",
+      "adapter": "mock"
+    },
+    {
+      "id": "claude-code",
+      "adapter": "mock"
+    },
+    {
+      "id": "opencode",
+      "adapter": "mock"
+    }
+  ]
+}

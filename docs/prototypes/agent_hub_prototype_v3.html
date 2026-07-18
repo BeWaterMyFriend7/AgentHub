@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Hub - AI Agent 会话管理台原型</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #e5eaf1;
+      --text: #172033;
+      --muted: #6e7890;
+      --primary: #4f6ef7;
+      --primary-soft: #eef2ff;
+      --success: #18a875;
+      --success-soft: #eaf8f2;
+      --warning: #e49b23;
+      --warning-soft: #fff6e6;
+      --danger: #df5b64;
+      --danger-soft: #fff0f1;
+      --shadow: 0 12px 32px rgba(30, 48, 84, 0.08);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(91, 114, 255, 0.08), transparent 28%),
+        var(--bg);
+    }
+
+    button, input, select { font: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 236px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 16px;
+      background: rgba(255, 255, 255, 0.92);
+      border-right: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 8px 22px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      color: #fff;
+      background: linear-gradient(135deg, #627bff, #7c5cff);
+      box-shadow: 0 8px 20px rgba(89, 105, 246, 0.28);
+      font-weight: 800;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 7px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 11px 13px;
+      border-radius: 11px;
+      cursor: pointer;
+      text-align: left;
+      transition: .18s ease;
+    }
+
+    .nav-btn:hover {
+      background: var(--surface-soft);
+      color: var(--text);
+    }
+
+    .nav-btn.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-weight: 700;
+    }
+
+    .nav-icon {
+      width: 24px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .sidebar-footer {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 18px;
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .sidebar-footer strong {
+      color: var(--success);
+    }
+
+    .main {
+      padding: 26px 30px 40px;
+      min-width: 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .topbar h2 {
+      margin: 0 0 5px;
+      font-size: 27px;
+      letter-spacing: -0.7px;
+    }
+
+    .topbar p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 13px;
+      cursor: pointer;
+      transition: .18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 7px 18px rgba(35, 53, 94, 0.09);
+    }
+
+    .btn.primary {
+      color: #fff;
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    .btn.soft {
+      border-color: transparent;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .btn.danger {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: transparent;
+    }
+
+    .btn.small {
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
+    .btn.icon-only {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,.96);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 17px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .stat-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 13px;
+    }
+
+    .stat-icon {
+      width: 31px;
+      height: 31px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .stat-value {
+      font-size: 27px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+    }
+
+    .stat-foot {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,.96);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 17px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+    }
+
+    .panel-title h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .panel-title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .search {
+      position: relative;
+      min-width: 190px;
+    }
+
+    .search input {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      border-radius: 10px;
+      padding: 9px 11px 9px 32px;
+      outline: none;
+      color: var(--text);
+    }
+
+    .search::before {
+      content: "⌕";
+      position: absolute;
+      left: 11px;
+      top: 7px;
+      color: var(--muted);
+    }
+
+    select {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 11px;
+      outline: none;
+    }
+
+    .instance-list {
+      padding: 10px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .instance-card {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 13px;
+      padding: 13px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      background: var(--surface-soft);
+      transition: .18s ease;
+    }
+
+    .instance-card:hover {
+      border-color: #dfe6f3;
+      transform: translateY(-1px);
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(45, 64, 104, .07);
+    }
+
+    .tool-logo {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--primary);
+    }
+
+    .instance-main {
+      min-width: 0;
+    }
+
+    .instance-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .instance-name {
+      font-weight: 750;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge.running {
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .badge.idle {
+      color: var(--warning);
+      background: var(--warning-soft);
+    }
+
+    .badge.stopped {
+      color: var(--muted);
+      background: #edf0f5;
+    }
+
+    .badge.error {
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .badge.type {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .instance-meta {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      gap: 13px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .instance-meta span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 250px;
+    }
+
+    .instance-actions {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .event-list {
+      padding: 8px 17px 16px;
+      max-height: 575px;
+      overflow: auto;
+    }
+
+    .event-item {
+      display: grid;
+      grid-template-columns: 11px minmax(0, 1fr);
+      gap: 11px;
+      padding: 13px 2px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .event-item:last-child { border-bottom: 0; }
+
+    .event-line {
+      position: relative;
+      padding-top: 4px;
+    }
+
+    .event-line::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: absolute;
+      top: 5px;
+      left: 0;
+      background: var(--primary);
+      box-shadow: 0 0 0 4px var(--primary-soft);
+    }
+
+    .event-body strong {
+      font-size: 13px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .event-body p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .event-time {
+      margin-top: 5px;
+      color: #98a1b3;
+      font-size: 11px;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .tool-card {
+      padding: 15px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+
+    .tool-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .tool-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 750;
+    }
+
+    .tool-card p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .tool-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+
+    .pending-panel {
+      margin-bottom: 18px;
+    }
+
+    .pending-list {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .pending-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid #f4dfb1;
+      border-radius: 13px;
+      background: var(--warning-soft);
+    }
+
+    .pending-item-main {
+      min-width: 0;
+    }
+
+    .pending-item strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .pending-item p {
+      margin: 0;
+      color: #8d6a2c;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .info-box {
+      margin: 18px 18px 0;
+      padding: 14px 15px;
+      border-radius: 12px;
+      background: var(--primary-soft);
+      color: #4657a6;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .field-help {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: -2px;
+    }
+
+    .prototype-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+
+    .detect-result {
+      border-radius: 12px;
+      padding: 13px 14px;
+      font-size: 12px;
+      line-height: 1.65;
+      display: none;
+    }
+
+    .detect-result.show { display: block; }
+
+    .detect-result.success {
+      color: #13775a;
+      background: var(--success-soft);
+      border: 1px solid #bfe8d8;
+    }
+
+    .detect-result.error {
+      color: #a8444c;
+      background: var(--danger-soft);
+      border: 1px solid #f0c4c8;
+    }
+
+    .detect-result.warning {
+      color: #8a6322;
+      background: var(--warning-soft);
+      border: 1px solid #efd9a9;
+    }
+
+    .detect-result strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .detect-result ul {
+      margin: 6px 0 0 18px;
+      padding: 0;
+    }
+
+    .logic-note {
+      margin: 0 18px 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #f7f9fd;
+      border: 1px dashed #d9e0ec;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .logic-note strong { color: var(--text); }
+
+    .state-executing {
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .state-permission {
+      color: var(--warning);
+      background: var(--warning-soft);
+    }
+
+    .state-review {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .state-interrupted {
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .hidden { display: none !important; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty .icon {
+      font-size: 34px;
+      margin-bottom: 8px;
+    }
+
+    .settings-form {
+      padding: 18px;
+      display: grid;
+      gap: 15px;
+      max-width: 760px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+    }
+
+    .form-label strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .form-label span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .form-control input,
+    .form-control select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 11px;
+      background: var(--surface-soft);
+      outline: none;
+    }
+
+    .switch {
+      width: 46px;
+      height: 25px;
+      border-radius: 999px;
+      background: #cfd5e2;
+      position: relative;
+      cursor: pointer;
+      transition: .2s ease;
+    }
+
+    .switch::after {
+      content: "";
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.18);
+      transition: .2s ease;
+    }
+
+    .switch.on {
+      background: var(--primary);
+    }
+
+    .switch.on::after {
+      left: 24px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(22, 29, 45, .4);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .modal-card {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 24px 80px rgba(19, 27, 45, .26);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 { margin: 0; }
+
+    .modal-body {
+      padding: 20px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .modal-body label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .modal-body input,
+    .modal-body select {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 11px;
+      outline: none;
+      color: var(--text);
+    }
+
+    .modal-footer {
+      padding: 15px 20px 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+    }
+
+    .toast-wrap {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 200;
+      display: grid;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      min-width: 250px;
+      padding: 12px 14px;
+      border-radius: 11px;
+      color: var(--text);
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(24, 35, 59, .18);
+      border: 1px solid var(--border);
+      animation: slideIn .22s ease;
+      font-size: 13px;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1100px) {
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .content-grid { grid-template-columns: 1fr; }
+      .tool-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 780px) {
+      .pending-list { grid-template-columns: 1fr; }
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .nav { grid-template-columns: repeat(3, 1fr); }
+      .sidebar-footer { display: none; }
+      .main { padding: 20px 16px 32px; }
+      .topbar { flex-direction: column; }
+      .top-actions { justify-content: flex-start; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .tool-grid { grid-template-columns: 1fr; }
+      .instance-card {
+        grid-template-columns: 42px minmax(0, 1fr);
+      }
+      .instance-actions {
+        grid-column: 1 / -1;
+        padding-left: 55px;
+      }
+      .form-row { grid-template-columns: 1fr; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AH</div>
+        <div>
+          <h1>Agent Hub</h1>
+          <p>AI Agent 会话管理台</p>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-page="overview">
+          <span class="nav-icon">⌂</span><span>总览</span>
+        </button>
+        <button class="nav-btn" data-page="tools">
+          <span class="nav-icon">◈</span><span>工具管理</span>
+        </button>
+        <button class="nav-btn" data-page="settings">
+          <span class="nav-icon">⚙</span><span>设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <strong>● 本地服务正常</strong><br />
+        最近扫描：<span id="lastScanSidebar">刚刚</span><br />
+        扫描间隔：5 秒
+      </div>
+    </aside>
+
+    <main class="main">
+      <section id="overview" class="page active">
+        <div class="topbar">
+          <div>
+            <h2>Agent 总览</h2>
+            <p>自动发现本机 Agent 工具，集中查看运行实例并快速跳转。</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn" id="refreshBtn">↻ 重新探测</button>
+            <button class="btn primary" id="addToolBtn">＋ 添加工具</button>
+          </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <section class="panel pending-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h3>待处理</h3>
+              <p>自动识别需要人工介入的会话，包括等待授权、等待验收和任务中断</p>
+            </div>
+          </div>
+          <div class="pending-list" id="pendingList"></div>
+          <div class="logic-note">
+            <strong>状态关系：</strong>
+            “正在运行”表示进程或窗口仍存在；“待处理”表示需要你介入。两者可以重叠：
+            运行中的 Agent 可能正在等待授权或验收；任务中断后进程可能已退出，但仍会保留在待处理区。
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h3>正在运行</h3>
+                <p>仅展示当前仍存在的进程或窗口；执行中、等待授权、等待验收都属于运行实例</p>
+              </div>
+              <div class="toolbar">
+                <div class="search">
+                  <input id="instanceSearch" placeholder="搜索工具或项目" />
+                </div>
+                <select id="typeFilter">
+                  <option value="all">全部类型</option>
+                  <option value="CLI">CLI</option>
+                  <option value="Desktop">桌面</option>
+                </select>
+              </div>
+            </div>
+            <div class="instance-list" id="instanceList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h3>最近启停</h3>
+                <p>仅记录客观状态变化</p>
+              </div>
+              <button class="btn small" id="clearEventsBtn">清空</button>
+            </div>
+            <div class="event-list" id="eventList"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="tools" class="page">
+        <div class="topbar">
+          <div>
+            <h2>工具管理</h2>
+            <p>查看自动发现结果，并维护启动命令与识别规则。</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn" id="detectToolsBtn">⌁ 自动探测</button>
+            <button class="btn primary" id="addToolBtn2">＋ 添加工具</button>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h3>已发现工具</h3>
+              <p>自动发现为主，人工补充为辅</p>
+            </div>
+          </div>
+          <div class="tool-grid" id="toolGrid"></div>
+        </section>
+      </section>
+
+      <section id="settings" class="page">
+        <div class="topbar">
+          <div>
+            <h2>运行设置</h2>
+            <p>这里只配置管理台本身的运行方式；每个 Agent 的识别规则在“工具管理”中设置。</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn primary" id="saveSettingsBtn">保存设置</button>
+          </div>
+        </div>
+
+        <section class="panel">
+          <div class="info-box">
+            <strong>自动探测默认开启。</strong>
+            管理台会周期性扫描本机进程和窗口，因此无需单独设置“是否自动探测”。工具名称、启动命令、进程关键字和窗口关键字统一放在工具配置中维护。
+          </div>
+
+          <div class="settings-form">
+            <div class="form-row">
+              <div class="form-label">
+                <strong>扫描间隔</strong>
+                <span>多久刷新一次运行实例</span>
+              </div>
+              <div class="form-control">
+                <select id="scanInterval">
+                  <option value="3">3 秒</option>
+                  <option value="5">5 秒</option>
+                  <option value="10">10 秒</option>
+                  <option value="30">30 秒</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-label">
+                <strong>启动后打开浏览器</strong>
+                <span>本地服务启动后自动进入管理页面</span>
+              </div>
+              <div class="form-control">
+                <div class="switch on" id="openBrowserSwitch"></div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-label">
+                <strong>默认终端</strong>
+                <span>仅在从管理台启动 CLI Agent 时使用</span>
+              </div>
+              <div class="form-control">
+                <select id="defaultTerminal">
+                  <option>Windows Terminal</option>
+                  <option>PowerShell</option>
+                  <option>CMD</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toolModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="toolModalTitle">添加 Agent 工具</h3>
+        <button class="btn icon-only" id="closeModalBtn">×</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          工具名称
+          <input id="toolNameInput" placeholder="例如：Kimi CLI" />
+        </label>
+
+        <label>
+          工具类型
+          <select id="toolTypeInput">
+            <option value="CLI">CLI</option>
+            <option value="Desktop">桌面客户端</option>
+          </select>
+        </label>
+
+        <label>
+          启动命令或程序路径
+          <input id="toolCommandInput" placeholder="CLI 填 codex；桌面应用填 exe 路径" />
+          <span class="field-help">用于点击“启动”时运行该工具。</span>
+        </label>
+
+        <label>
+          进程匹配关键字
+          <input id="toolKeywordInput" placeholder="例如：codex、Cursor.exe" />
+          <span class="field-help">用于在 Windows 进程列表中识别该工具。</span>
+        </label>
+
+        <label>
+          命令行匹配关键字
+          <input id="commandKeywordInput" placeholder="例如：@openai/codex" />
+          <span class="field-help">当实际进程名是 node.exe 时，用它区分不同 CLI Agent。</span>
+        </label>
+
+        <label>
+          窗口标题关键字
+          <input id="windowKeywordInput" placeholder="例如：Cursor；CLI 工具可留空" />
+          <span class="field-help">主要用于识别和跳转桌面客户端窗口。</span>
+        </label>
+
+        <div id="detectResult" class="detect-result"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="cancelModalBtn">取消</button>
+        <button class="btn soft" id="testConfigBtn">⌁ 探测配置</button>
+        <button class="btn primary" id="confirmAddToolBtn">保存配置</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script>
+    const STORAGE_KEY = "agentHubPrototypeV3";
+
+    const defaultState = {
+      tools: [
+        { id: 1, name: "Codex", type: "CLI", installed: true, running: true, command: "codex", processKeyword: "node.exe", commandKeyword: "@openai/codex", windowKeyword: "", icon: "CX", desc: "通过 npm 安装的 OpenAI 编码 Agent" },
+        { id: 2, name: "Claude Code", type: "CLI", installed: true, running: true, command: "claude", processKeyword: "node.exe", commandKeyword: "claude-code", windowKeyword: "", icon: "CC", desc: "运行于终端中的 Claude 编码 Agent" },
+        { id: 3, name: "OpenCode", type: "CLI", installed: true, running: false, command: "opencode", processKeyword: "opencode", commandKeyword: "opencode", windowKeyword: "", icon: "OC", desc: "本地命令行 Agent 工具" },
+        { id: 4, name: "Gemini CLI", type: "CLI", installed: true, running: false, command: "gemini", processKeyword: "node.exe", commandKeyword: "gemini", windowKeyword: "", icon: "GM", desc: "Google Gemini 命令行工具" },
+        { id: 5, name: "Cursor", type: "Desktop", installed: true, running: true, command: "Cursor.exe", processKeyword: "Cursor.exe", commandKeyword: "", windowKeyword: "Cursor", icon: "CU", desc: "AI 编程桌面客户端" },
+        { id: 6, name: "Windsurf", type: "Desktop", installed: true, running: false, command: "Windsurf.exe", processKeyword: "Windsurf.exe", commandKeyword: "", windowKeyword: "Windsurf", icon: "WS", desc: "AI 编程桌面客户端" },
+        { id: 7, name: "Claude Desktop", type: "Desktop", installed: false, running: false, command: "Claude.exe", processKeyword: "Claude.exe", commandKeyword: "", windowKeyword: "Claude", icon: "CD", desc: "Claude 桌面客户端" }
+      ],
+      instances: [
+        {
+          id: 101, tool: "Codex", type: "CLI", project: "Nacos Sidecar",
+          projectPath: "D:\\Projects\\nacos-sidecar", pid: 10520,
+          title: "PowerShell - codex", started: "20:10", duration: "1 小时 25 分",
+          runtimeStatus: "running", activityStatus: "executing",
+          attentionStatus: "none", attentionReason: "", icon: "CX"
+        },
+        {
+          id: 102, tool: "Codex", type: "CLI", project: "Kafka 压测",
+          projectPath: "D:\\Projects\\kafka-test", pid: 11884,
+          title: "Windows Terminal - Kafka", started: "20:42", duration: "53 分",
+          runtimeStatus: "running", activityStatus: "waiting_permission",
+          attentionStatus: "pending", attentionReason: "Agent 等待权限授权后继续执行", icon: "CX"
+        },
+        {
+          id: 103, tool: "Claude Code", type: "CLI", project: "Skill 文档整理",
+          projectPath: "D:\\Projects\\skills", pid: 12860,
+          title: "PowerShell - claude", started: "21:03", duration: "32 分",
+          runtimeStatus: "running", activityStatus: "awaiting_review",
+          attentionStatus: "pending", attentionReason: "规划和执行已完成，等待人工验收", icon: "CC"
+        },
+        {
+          id: 104, tool: "Cursor", type: "Desktop", project: "agent-hub",
+          projectPath: "D:\\Projects\\agent-hub", pid: 8620,
+          title: "agent-hub - Cursor", started: "18:30", duration: "3 小时 05 分",
+          runtimeStatus: "running", activityStatus: "executing",
+          attentionStatus: "none", attentionReason: "", icon: "CU"
+        },
+        {
+          id: 105, tool: "OpenCode", type: "CLI", project: "文档生成",
+          projectPath: "D:\\Projects\\docs", pid: 0,
+          title: "OpenCode 会话已退出", started: "19:20", duration: "42 分",
+          runtimeStatus: "error", activityStatus: "interrupted",
+          attentionStatus: "pending", attentionReason: "任务异常中断，需要检查日志或重新启动", icon: "OC"
+        }
+      ],
+      events: [
+        { title: "Codex 等待权限授权", detail: "Kafka 压测 · PID 11884", time: "今天 21:28" },
+        { title: "Claude Code 等待验收", detail: "Skill 文档整理 · 规划执行完成", time: "今天 21:20" },
+        { title: "OpenCode 任务中断", detail: "文档生成 · 进程已退出", time: "今天 20:02" },
+        { title: "Cursor 窗口启动", detail: "agent-hub - Cursor", time: "今天 18:30" }
+      ],
+      settings: {
+        scanInterval: "5",
+        openBrowser: true,
+        defaultTerminal: "Windows Terminal"
+      }
+    };
+
+    const mockEnvironment = {
+      commands: ["codex", "claude", "opencode", "gemini", "Cursor.exe", "Windsurf.exe"],
+      processKeywords: ["node.exe", "codex", "claude", "claude-code", "opencode", "gemini", "Cursor.exe", "Windsurf.exe"],
+      commandKeywords: ["@openai/codex", "claude-code", "opencode", "gemini"],
+      windowKeywords: ["Cursor", "Windsurf", "Windows Terminal", "PowerShell"]
+    };
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (!saved) return clone(defaultState);
+        return {
+          tools: Array.isArray(saved.tools) ? saved.tools : clone(defaultState.tools),
+          instances: Array.isArray(saved.instances) ? saved.instances : clone(defaultState.instances),
+          events: Array.isArray(saved.events) ? saved.events : clone(defaultState.events),
+          settings: { ...defaultState.settings, ...(saved.settings || {}) }
+        };
+      } catch {
+        return clone(defaultState);
+      }
+    }
+
+    const state = loadState();
+    let editingToolId = null;
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function toast(message) {
+      const el = document.createElement("div");
+      el.className = "toast";
+      el.textContent = message;
+      $("#toastWrap").appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    function addEvent(title, detail) {
+      state.events.unshift({ title, detail, time: "刚刚" });
+      state.events = state.events.slice(0, 50);
+      saveState();
+    }
+
+    function activityLabel(item) {
+      const map = {
+        executing: ["执行中", "state-executing"],
+        waiting_permission: ["等待授权", "state-permission"],
+        awaiting_review: ["等待验收", "state-review"],
+        interrupted: ["任务中断", "state-interrupted"]
+      };
+      return map[item.activityStatus] || ["状态未知", "stopped"];
+    }
+
+    function activeInstances() {
+      return state.instances.filter(i => i.runtimeStatus === "running");
+    }
+
+    function pendingInstances() {
+      return state.instances.filter(i => i.attentionStatus === "pending");
+    }
+
+    function renderStats() {
+      const discovered = state.tools.filter(t => t.installed).length;
+      const running = activeInstances().length;
+      const pending = pendingInstances().length;
+      const cli = activeInstances().filter(i => i.type === "CLI").length;
+      const desktop = activeInstances().filter(i => i.type === "Desktop").length;
+
+      const cards = [
+        ["已发现工具", discovered, "◈", "本机已安装或已配置"],
+        ["运行实例", running, "●", "当前仍存在的进程与窗口"],
+        ["待处理", pending, "!", "等待授权、验收或中断检查"],
+        ["CLI 实例", cli, "⌘", "当前运行的终端类 Agent"],
+        ["桌面窗口", desktop, "▣", "当前运行的桌面客户端"]
+      ];
+
+      $("#stats").innerHTML = cards.map(([label, value, icon, foot]) => `
+        <div class="stat-card">
+          <div class="stat-head">
+            <span>${label}</span>
+            <span class="stat-icon">${icon}</span>
+          </div>
+          <div class="stat-value">${value}</div>
+          <div class="stat-foot">${foot}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderPending() {
+      const items = pendingInstances();
+      if (!items.length) {
+        $("#pendingList").innerHTML = `
+          <div class="empty" style="grid-column:1/-1;padding:22px">
+            当前没有需要人工介入的会话
+          </div>`;
+        return;
+      }
+
+      $("#pendingList").innerHTML = items.map(item => {
+        const [label, cls] = activityLabel(item);
+        return `
+          <div class="pending-item">
+            <div class="pending-item-main">
+              <strong>${item.tool} · ${item.project}</strong>
+              <p>${item.attentionReason}</p>
+              <div style="margin-top:7px">
+                <span class="badge ${cls}"><span class="dot"></span>${label}</span>
+                <span class="badge type">${item.runtimeStatus === "running" ? "进程仍在运行" : "进程已退出"}</span>
+              </div>
+            </div>
+            <div class="instance-actions">
+              <button class="btn small soft" data-pending-action="focus" data-id="${item.id}">
+                ${item.runtimeStatus === "running"
+                  ? (item.type === "CLI" ? "跳转终端" : "跳转窗口")
+                  : "查看详情"}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderInstances() {
+      const keyword = $("#instanceSearch")?.value.trim().toLowerCase() || "";
+      const type = $("#typeFilter")?.value || "all";
+
+      const items = activeInstances().filter(item => {
+        const matchKeyword = [item.tool, item.project, item.title, item.projectPath]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+        const matchType = type === "all" || item.type === type;
+        return matchKeyword && matchType;
+      });
+
+      if (!items.length) {
+        $("#instanceList").innerHTML = `
+          <div class="empty">
+            <div class="icon">⌕</div>
+            未找到匹配的运行实例
+          </div>`;
+        return;
+      }
+
+      $("#instanceList").innerHTML = items.map(item => {
+        const [label, cls] = activityLabel(item);
+        const jumpLabel = item.type === "CLI" ? "跳转终端" : "跳转窗口";
+        return `
+          <div class="instance-card">
+            <div class="tool-logo">${item.icon}</div>
+            <div class="instance-main">
+              <div class="instance-top">
+                <div class="instance-name">${item.tool} · ${item.project}</div>
+                <span class="badge ${cls}"><span class="dot"></span>${label}</span>
+                ${item.attentionStatus === "pending" ? `<span class="badge idle"><span class="dot"></span>需人工介入</span>` : ""}
+                <span class="badge type">${item.type}</span>
+              </div>
+              <div class="instance-meta">
+                <span>PID ${item.pid}</span>
+                <span>${item.title}</span>
+                <span title="${item.projectPath || "未识别项目文件夹"}">项目：${item.projectPath || "未识别"}</span>
+                <span>已运行 ${item.duration}</span>
+              </div>
+            </div>
+            <div class="instance-actions">
+              <button class="btn small soft" data-action="focus" data-id="${item.id}">↗ ${jumpLabel}</button>
+              <button class="btn small" data-action="folder" data-id="${item.id}" title="使用资源管理器打开该实例关联的项目文件夹">▤ 项目文件夹</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderEvents() {
+      if (!state.events.length) {
+        $("#eventList").innerHTML = `
+          <div class="empty">
+            <div class="icon">◌</div>
+            暂无状态记录
+          </div>`;
+        return;
+      }
+
+      $("#eventList").innerHTML = state.events.map(event => `
+        <div class="event-item">
+          <div class="event-line"></div>
+          <div class="event-body">
+            <strong>${event.title}</strong>
+            <p>${event.detail}</p>
+            <div class="event-time">${event.time}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderTools() {
+      $("#toolGrid").innerHTML = state.tools.map(tool => `
+        <div class="tool-card">
+          <div class="tool-card-head">
+            <div class="tool-name">
+              <span class="tool-logo">${tool.icon}</span>
+              <span>${tool.name}</span>
+            </div>
+            <span class="badge ${tool.installed ? (tool.running ? "running" : "idle") : "stopped"}">
+              <span class="dot"></span>
+              ${tool.installed ? (tool.running ? "运行中" : "已安装") : "未发现"}
+            </span>
+          </div>
+          <p>
+            类型：${tool.type}<br />
+            启动：${tool.command || "未配置"}<br />
+            进程规则：${tool.processKeyword || "未配置"}<br />
+            ${tool.commandKeyword ? `命令行规则：${tool.commandKeyword}` : `窗口规则：${tool.windowKeyword || "未配置"}`}
+          </p>
+          <div class="tool-card-actions">
+            ${tool.installed
+              ? `<button class="btn small ${tool.running ? "soft" : "primary"}" data-tool-action="${tool.running ? "focus" : "launch"}" data-tool-id="${tool.id}">
+                   ${tool.running ? "↗ 跳转" : "▶ 启动"}
+                 </button>`
+              : `<button class="btn small" data-tool-action="locate" data-tool-id="${tool.id}">⌕ 指定路径</button>`
+            }
+            <button class="btn small" data-tool-action="edit" data-tool-id="${tool.id}">⚙ 配置</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function applySettingsToUI() {
+      $("#scanInterval").value = state.settings.scanInterval;
+      $("#defaultTerminal").value = state.settings.defaultTerminal;
+      $("#openBrowserSwitch").classList.toggle("on", !!state.settings.openBrowser);
+    }
+
+    function refreshAll() {
+      renderStats();
+      renderPending();
+      renderInstances();
+      renderEvents();
+      renderTools();
+      applySettingsToUI();
+    }
+
+    function simulateDetect() {
+      const btns = ["#refreshBtn", "#detectToolsBtn"].map(s => $(s)).filter(Boolean);
+      btns.forEach(btn => {
+        btn.disabled = true;
+        btn.dataset.old = btn.textContent;
+        btn.textContent = "正在探测...";
+      });
+
+      setTimeout(() => {
+        // Prototype behavior:
+        // after user jumps to handle a pending running session,
+        // the next scan detects that it no longer needs attention.
+        let resolvedCount = 0;
+        state.instances.forEach(item => {
+          if (item.awaitingAutoResolve) {
+            item.awaitingAutoResolve = false;
+            item.attentionStatus = "none";
+            item.attentionReason = "";
+            item.activityStatus = "executing";
+            resolvedCount += 1;
+            addEvent("待处理状态自动解除", `${item.tool} · ${item.project}`);
+          }
+        });
+
+        const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        $("#lastScanSidebar").textContent = time;
+        addEvent(
+          "自动探测完成",
+          `发现 ${state.tools.filter(t => t.installed).length} 个工具、${activeInstances().length} 个运行实例${resolvedCount ? `，自动解除 ${resolvedCount} 个待处理状态` : ""}`
+        );
+        saveState();
+        refreshAll();
+
+        btns.forEach(btn => {
+          btn.disabled = false;
+          btn.textContent = btn.dataset.old;
+        });
+        toast(resolvedCount ? "已根据最新状态自动更新待处理事项" : "探测完成，未发现状态变化");
+      }, 900);
+    }
+
+    function clearModal() {
+      ["#toolNameInput", "#toolCommandInput", "#toolKeywordInput", "#commandKeywordInput", "#windowKeywordInput"]
+        .forEach(id => $(id).value = "");
+      $("#toolTypeInput").value = "CLI";
+      showDetectResult(null);
+    }
+
+    function showDetectResult(result) {
+      const box = $("#detectResult");
+      box.className = "detect-result";
+      box.innerHTML = "";
+      if (!result) return;
+
+      box.classList.add("show", result.level);
+      box.innerHTML = `
+        <strong>${result.title}</strong>
+        <div>${result.summary}</div>
+        ${result.items?.length ? `<ul>${result.items.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}
+      `;
+    }
+
+    function readToolForm() {
+      return {
+        name: $("#toolNameInput").value.trim(),
+        type: $("#toolTypeInput").value,
+        command: $("#toolCommandInput").value.trim(),
+        processKeyword: $("#toolKeywordInput").value.trim(),
+        commandKeyword: $("#commandKeywordInput").value.trim(),
+        windowKeyword: $("#windowKeywordInput").value.trim()
+      };
+    }
+
+    function testToolConfiguration() {
+      const config = readToolForm();
+      const failures = [];
+      const warnings = [];
+      const matches = [];
+
+      if (!config.name) failures.push("未填写工具名称。");
+      if (!config.command) failures.push("未填写启动命令或程序路径。");
+      if (!config.processKeyword) failures.push("未填写进程匹配关键字，无法识别运行进程。");
+
+      if (config.type === "CLI") {
+        if (/^(node(\.exe)?|python(\.exe)?|java(\.exe)?)$/i.test(config.processKeyword) && !config.commandKeyword) {
+          failures.push(`进程关键字“${config.processKeyword}”过于通用，必须补充命令行匹配关键字。`);
+        }
+        if (config.windowKeyword) warnings.push("CLI 工具通常不依赖窗口标题规则，该字段可留空。");
+      } else {
+        if (!config.windowKeyword) {
+          warnings.push("未填写窗口标题关键字：可以识别进程，但跳转到具体桌面窗口的准确度会降低。");
+        }
+      }
+
+      if (config.command && mockEnvironment.commands.some(x => x.toLowerCase() === config.command.toLowerCase())) {
+        matches.push(`已找到启动命令或程序：${config.command}`);
+      } else if (config.command) {
+        failures.push(`未在模拟环境中找到启动命令或程序“${config.command}”。请检查 PATH、程序路径或文件名。`);
+      }
+
+      if (config.processKeyword && mockEnvironment.processKeywords.some(x =>
+        x.toLowerCase().includes(config.processKeyword.toLowerCase()) ||
+        config.processKeyword.toLowerCase().includes(x.toLowerCase())
+      )) {
+        matches.push(`进程规则可匹配：${config.processKeyword}`);
+      } else if (config.processKeyword) {
+        failures.push(`当前进程列表中没有匹配“${config.processKeyword}”的进程。工具可能未运行，或关键字不准确。`);
+      }
+
+      if (config.commandKeyword) {
+        if (mockEnvironment.commandKeywords.some(x =>
+          x.toLowerCase().includes(config.commandKeyword.toLowerCase()) ||
+          config.commandKeyword.toLowerCase().includes(x.toLowerCase())
+        )) {
+          matches.push(`命令行规则可匹配：${config.commandKeyword}`);
+        } else {
+          failures.push(`当前命令行中没有匹配“${config.commandKeyword}”的内容。请检查包名或启动参数。`);
+        }
+      }
+
+      if (config.windowKeyword) {
+        if (mockEnvironment.windowKeywords.some(x =>
+          x.toLowerCase().includes(config.windowKeyword.toLowerCase()) ||
+          config.windowKeyword.toLowerCase().includes(x.toLowerCase())
+        )) {
+          matches.push(`窗口标题规则可匹配：${config.windowKeyword}`);
+        } else {
+          failures.push(`没有找到标题包含“${config.windowKeyword}”的窗口。请确认应用已打开，或调整标题关键字。`);
+        }
+      }
+
+      if (failures.length) {
+        showDetectResult({
+          level: "error",
+          title: "探测失败",
+          summary: `配置尚不能稳定识别 ${config.name || "该工具"}。`,
+          items: [...failures, ...warnings.map(x => `提示：${x}`)]
+        });
+        return false;
+      }
+
+      if (warnings.length) {
+        showDetectResult({
+          level: "warning",
+          title: "探测通过，但存在提示",
+          summary: matches.join("；"),
+          items: warnings
+        });
+        return true;
+      }
+
+      showDetectResult({
+        level: "success",
+        title: "探测通过",
+        summary: `配置可以识别 ${config.name}。`,
+        items: matches
+      });
+      return true;
+    }
+
+    function openToolModal(toolId = null) {
+      editingToolId = toolId;
+      clearModal();
+
+      if (toolId) {
+        const tool = state.tools.find(t => t.id === toolId);
+        if (!tool) return;
+        $("#toolModalTitle").textContent = `配置 ${tool.name}`;
+        $("#toolNameInput").value = tool.name || "";
+        $("#toolTypeInput").value = tool.type || "CLI";
+        $("#toolCommandInput").value = tool.command || "";
+        $("#toolKeywordInput").value = tool.processKeyword || "";
+        $("#commandKeywordInput").value = tool.commandKeyword || "";
+        $("#windowKeywordInput").value = tool.windowKeyword || "";
+      } else {
+        $("#toolModalTitle").textContent = "添加 Agent 工具";
+      }
+
+      $("#toolModal").classList.remove("hidden");
+      $("#toolNameInput").focus();
+    }
+
+    function closeModal() {
+      $("#toolModal").classList.add("hidden");
+      editingToolId = null;
+      clearModal();
+    }
+
+    function saveToolConfig() {
+      const config = readToolForm();
+
+      if (!config.name || !config.command || !config.processKeyword) {
+        showDetectResult({
+          level: "error",
+          title: "无法保存",
+          summary: "请至少填写工具名称、启动命令和进程匹配关键字。",
+          items: []
+        });
+        return;
+      }
+
+      if (editingToolId) {
+        const tool = state.tools.find(t => t.id === editingToolId);
+        Object.assign(tool, {
+          ...config,
+          icon: config.name.slice(0, 2).toUpperCase()
+        });
+        addEvent("工具配置已更新", `${config.name} · ${config.type}`);
+        toast(`${config.name} 配置已保存`);
+      } else {
+        state.tools.push({
+          id: Date.now(),
+          ...config,
+          installed: true,
+          running: false,
+          icon: config.name.slice(0, 2).toUpperCase(),
+          desc: "用户手动添加的 Agent 工具"
+        });
+        addEvent("新增 Agent 工具", `${config.name} · ${config.type}`);
+        toast(`${config.name} 已添加`);
+      }
+
+      saveState();
+      closeModal();
+      refreshAll();
+    }
+
+    function performFocus(item) {
+      if (item.runtimeStatus === "running") {
+        addEvent("执行窗口跳转", `${item.tool} · ${item.project}`);
+        item.awaitingAutoResolve = item.attentionStatus === "pending";
+        saveState();
+        toast(`已跳转处理；下一次探测会根据真实状态自动判断是否解除待处理`);
+      } else {
+        toast(`该任务已中断。正式版本将打开日志或提供重新启动入口`);
+      }
+      refreshAll();
+    }
+
+    $$(".nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        $$(".nav-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        $$(".page").forEach(p => p.classList.remove("active"));
+        $("#" + btn.dataset.page).classList.add("active");
+      });
+    });
+
+    $("#refreshBtn").addEventListener("click", simulateDetect);
+    $("#detectToolsBtn").addEventListener("click", simulateDetect);
+    $("#instanceSearch").addEventListener("input", renderInstances);
+    $("#typeFilter").addEventListener("change", renderInstances);
+
+    $("#pendingList").addEventListener("click", event => {
+      const btn = event.target.closest("[data-pending-action]");
+      if (!btn) return;
+      const item = state.instances.find(i => i.id === Number(btn.dataset.id));
+      if (item) performFocus(item);
+    });
+
+    $("#instanceList").addEventListener("click", event => {
+      const btn = event.target.closest("[data-action]");
+      if (!btn) return;
+      const item = state.instances.find(i => i.id === Number(btn.dataset.id));
+      if (!item) return;
+
+      if (btn.dataset.action === "focus") {
+        performFocus(item);
+      }
+
+      if (btn.dataset.action === "folder") {
+        toast(`正式版本将用资源管理器打开：${item.projectPath || item.project}`);
+      }
+    });
+
+    $("#toolGrid").addEventListener("click", event => {
+      const btn = event.target.closest("[data-tool-action]");
+      if (!btn) return;
+      const tool = state.tools.find(t => t.id === Number(btn.dataset.toolId));
+      if (!tool) return;
+
+      const action = btn.dataset.toolAction;
+      if (action === "launch") {
+        tool.running = true;
+        const newInstance = {
+          id: Date.now(),
+          tool: tool.name,
+          type: tool.type,
+          project: "新建会话",
+          projectPath: "",
+          pid: Math.floor(9000 + Math.random() * 9000),
+          title: `${tool.name} - 新建会话`,
+          started: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+          duration: "刚刚",
+          runtimeStatus: "running",
+          activityStatus: "executing",
+          attentionStatus: "none",
+          attentionReason: "",
+          icon: tool.icon
+        };
+        state.instances.unshift(newInstance);
+        addEvent(`${tool.name} 已启动`, `PID ${newInstance.pid}`);
+        saveState();
+        toast(`${tool.name} 启动成功（原型模拟）`);
+      } else if (action === "focus") {
+        toast(`正式版本将激活 ${tool.name} 窗口`);
+      } else if (action === "locate" || action === "edit") {
+        openToolModal(tool.id);
+      }
+      refreshAll();
+    });
+
+    $("#clearEventsBtn").addEventListener("click", () => {
+      if (confirm("确定清空最近状态记录吗？")) {
+        state.events = [];
+        saveState();
+        renderEvents();
+        toast("状态记录已清空");
+      }
+    });
+
+    ["#addToolBtn", "#addToolBtn2"].forEach(id => $(id).addEventListener("click", () => openToolModal()));
+    $("#closeModalBtn").addEventListener("click", closeModal);
+    $("#cancelModalBtn").addEventListener("click", closeModal);
+    $("#testConfigBtn").addEventListener("click", testToolConfiguration);
+    $("#confirmAddToolBtn").addEventListener("click", saveToolConfig);
+    $("#toolModal").addEventListener("click", e => {
+      if (e.target.id === "toolModal") closeModal();
+    });
+
+    $("#openBrowserSwitch").addEventListener("click", () => {
+      $("#openBrowserSwitch").classList.toggle("on");
+    });
+
+    $("#saveSettingsBtn").addEventListener("click", () => {
+      state.settings.scanInterval = $("#scanInterval").value;
+      state.settings.openBrowser = $("#openBrowserSwitch").classList.contains("on");
+      state.settings.defaultTerminal = $("#defaultTerminal").value;
+      saveState();
+      toast("运行设置已保存");
+    });
+
+    refreshAll();
+  </script>
+</body>
+</html>

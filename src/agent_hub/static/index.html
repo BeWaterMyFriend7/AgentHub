@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Session Hub</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">AH</div>
+        <div>
+          <strong>Agent Hub</strong>
+          <span>内部会话聚合 MVP</span>
+        </div>
+      </div>
+
+      <nav>
+        <button class="nav active" data-page="overview">⌂ <span>会话总览</span></button>
+        <button class="nav" data-page="tools">◈ <span>工具接入</span></button>
+      </nav>
+
+      <div class="runtime">
+        <b>● Demo 服务正常</b>
+        <span>Mock Adapter</span>
+        <span>刷新间隔：5 秒</span>
+      </div>
+    </aside>
+
+    <main>
+      <section id="overview" class="page active">
+        <header>
+          <div>
+            <h1>AI Agent 会话总览</h1>
+            <p>聚合内部会话、规划状态与待处理事项，而不是简单统计窗口。</p>
+          </div>
+          <div class="header-actions">
+            <button class="button" id="refreshBtn">↻ 刷新</button>
+            <button class="button primary" id="tickBtn">▶ 模拟下一轮探测</button>
+          </div>
+        </header>
+
+        <div class="stats" id="stats"></div>
+
+        <section class="panel attention-panel">
+          <div class="panel-head">
+            <div>
+              <h2>待处理</h2>
+              <p>等待授权、等待输入、等待验收或任务中断的会话。</p>
+            </div>
+            <span class="count-badge" id="attentionCount">0</span>
+          </div>
+          <div class="attention-grid" id="attentionList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head session-head">
+            <div>
+              <h2>全部会话</h2>
+              <p>每张卡片代表 Agent 内部真实会话。</p>
+            </div>
+            <div class="filters">
+              <input id="searchInput" placeholder="搜索会话、项目或 Agent" />
+              <select id="statusFilter">
+                <option value="all">全部状态</option>
+                <option value="executing">执行中</option>
+                <option value="waiting_permission">等待授权</option>
+                <option value="waiting_input">等待输入</option>
+                <option value="awaiting_review">等待验收</option>
+                <option value="interrupted">任务中断</option>
+                <option value="closed">已关闭</option>
+              </select>
+            </div>
+          </div>
+          <div class="session-list" id="sessionList"></div>
+        </section>
+      </section>
+
+      <section id="tools" class="page">
+        <header>
+          <div>
+            <h1>工具接入</h1>
+            <p>只有支持内部会话发现、状态读取和精确恢复的工具，才算完整接入。</p>
+          </div>
+        </header>
+        <div class="tool-grid" id="toolGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">操作结果</h3>
+        <button id="modalClose">×</button>
+      </div>
+      <div id="modalContent" class="modal-content"></div>
+      <div class="modal-foot">
+        <button class="button primary" id="modalOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

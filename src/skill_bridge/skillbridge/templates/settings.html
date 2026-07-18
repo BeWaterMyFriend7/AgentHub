@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Agent 设置{% endblock %}
+{% block content %}
+<h2 class="page-title">Agent 配置</h2>
+
+<div class="matrix" style="margin-bottom: 24px;">
+<table class="matrix-table">
+    <thead>
+        <tr>
+            <th>启用</th>
+            <th>名称</th>
+            <th>ID</th>
+            <th>Skill 根目录</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for agent in agents %}
+        <tr data-agent-id="{{ agent.id }}" data-agent-name="{{ agent.name }}" data-agent-root="{{ agent.skill_root }}">
+            <td>
+                <input type="checkbox" class="state-checkbox" {{ 'checked' if agent.enabled else '' }}
+                       onchange="toggleAgent('{{ agent.id }}', this.checked)">
+            </td>
+            <td><strong>{{ agent.name }}</strong></td>
+            <td style="color: var(--text-muted); font-size: 12px; font-family: monospace;">{{ agent.id }}</td>
+            <td style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; font-family: monospace; color: var(--text-secondary);">{{ agent.skill_root }}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm" onclick="editAgent('{{ agent.id }}')" style="margin-right:4px;">编辑</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteAgent('{{ agent.id }}')">删除</button>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5"><div class="empty-state">暂无 Agent 配置</div></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<h3 class="page-title" style="font-size: 16px; margin-bottom: 12px;">新增 Agent</h3>
+<div class="skill-detail" style="padding: 20px;">
+<form onsubmit="addAgent(event)">
+    <div class="form-group">
+        <label>Agent ID</label>
+        <input type="text" name="id" required pattern="[a-z0-9-]+" placeholder="my-agent">
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">小写字母、数字、连字符</div>
+    </div>
+    <div class="form-group">
+        <label>名称</label>
+        <input type="text" name="name" required placeholder="My Agent">
+    </div>
+    <div class="form-group">
+        <label>Skill 根目录</label>
+        <div style="display:flex;gap:6px;">
+            <input type="text" name="skill_root" id="skillRootInput" required placeholder="C:\Users\...\.codex\skills" style="flex:1;">
+            <button type="button" class="btn btn-sm btn-primary" onclick="nativePick('skillRootInput', this)">选择</button>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">添加</button>
+</form>
+</div>
+
+<div class="modal-overlay" id="editModal">
+    <div class="modal" style="max-width: 500px;">
+        <h3>编辑 Agent</h3>
+        <form id="editForm" style="margin-top:12px;">
+            <div class="form-group">
+                <label>Agent ID（不可修改）</label>
+                <input type="text" id="editId" readonly style="background:#f8fafc;color:#94a3b8;">
+            </div>
+            <div class="form-group">
+                <label>名称</label>
+                <input type="text" id="editName" required>
+            </div>
+            <div class="form-group">
+                <label>Skill 根目录</label>
+                <div style="display:flex;gap:6px;">
+                    <input type="text" id="editRoot" required style="flex:1;">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="nativePick('editRoot', this)">选择</button>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button type="button" class="btn" onclick="closeEdit()">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function nativePick(inputId, btn) {
+    var orig = btn.textContent;
+    btn.textContent = '打开中...';
+    btn.disabled = true;
+    apiFetch('/api/pick-folder', { method: 'POST' }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.path) {
+            document.getElementById(inputId).value = data.path;
+        } else if (data.error) {
+            alert('选择失败: ' + data.error);
+        }
+    }).catch(function(err) {
+        alert('选择失败: ' + err.message);
+    }).finally(function() {
+        btn.textContent = orig;
+        btn.disabled = false;
+    });
+}
+
+function editAgent(id) {
+    var row = document.querySelector('tr[data-agent-id="' + id + '"]');
+    if (!row) return;
+    document.getElementById('editId').value = id;
+    document.getElementById('editName').value = row.dataset.agentName;
+    document.getElementById('editRoot').value = row.dataset.agentRoot;
+    document.getElementById('editModal').classList.add('active');
+}
+
+function closeEdit() {
+    document.getElementById('editModal').classList.remove('active');
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var id = document.getElementById('editId').value;
+    var name = document.getElementById('editName').value;
+    var root = document.getElementById('editRoot').value;
+    if (!name || !root) return;
+    closeEdit();
+    try {
+        var resp = await apiFetch('/api/agents/' + encodeURIComponent(id), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, skill_root: root })
+        });
+        location.reload();
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+});
+
+function apiFetch(url, options) {
+    if (!options) options = {};
+    if (!options.headers) options.headers = {};
+    options.headers['X-Session-Token'] = SESSION_TOKEN;
+    return fetch(url, options);
+}
+
+async function toggleAgent(id, enabled) {
+    await apiFetch('/api/agents/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: enabled })
+    });
+}
+
+async function deleteAgent(id) {
+    if (!confirm('确定删除 Agent "' + id + '"？不会删除任何文件。')) return;
+    await apiFetch('/api/agents/' + id, { method: 'DELETE' });
+    location.reload();
+}
+
+async function addAgent(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const data = {};
+    formData.forEach((value, key) => { data[key] = value; });
+    data.ignore_patterns = ['.system', '.internal'];
+    const resp = await apiFetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    const result = await resp.json();
+    if (result.success) {
+        location.reload();
+    } else {
+        alert('添加失败: ' + (result.error || '未知错误'));
+    }
+}
+</script>
+{% endblock %}
