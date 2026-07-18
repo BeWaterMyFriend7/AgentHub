@@ -1,17 +1,38 @@
 # AgentHub 文档索引
 
-本目录将需求意图、架构决策、验证证据和历史记录分开保存，避免所有内容都堆积在一份不断改写的设计文档中。
+文档按产品需求、工程方案、质量验证和项目过程组织。目录保持精简；只有内容量确实需要独立文件时才继续拆分。
 
-| 目录 | 用途 | 主要文档 |
+## 目录
+
+| 目录 | 回答的问题 | 主要文档 |
 | --- | --- | --- |
-| `requirements/` | 用户需要什么、哪些内容属于范围 | `agent-session-hub-v0.2.md`、`skill-management-v1.0.md`、`capability-management.md` |
-| `architecture/` | 当前系统结构与边界 | `overview.md` |
-| `architecture/adr/` | 需要保留历史脉络的架构决策 | `0001-src-and-docs-layout.md`、`0002-capability-adapter-boundary.md` |
-| `testing/` | 测试策略、验收规则和验证证据 | `strategy.md`、`verification/README.md` |
+| `prd/` | 为什么做、为谁做、做什么 | `agenthub-v1.md`（唯一当前总 PRD）及历史/专题来源 |
+| `architecture/` | 当前系统是什么样、准备如何实现、为什么这样决策 | `overview.md`、`design.md`、`adr/` |
+| `quality/` | 业务怎样验收、技术怎样测试、某次验证结果如何 | `bdd/`、`testing.md`、`verification/` |
+| `process/` | 下一步做什么、当前待办、已经学到什么 | `roadmap.md`、`todo.md`、`learnings.md` |
+| `guides/` | 如何操作、开发和维护 | `skill-bridge-operations.md` |
 | `prototypes/` | 非生产 UI 和技术实验 | `agent_hub_prototype_v3.html` |
-| `guides/` | 运维和开发操作指南 | `skill-bridge-operations.md` |
-| `planning/` | 路线图与可执行工作 | `TODO.md` |
-| `learnings/` | 可能影响后续决策的经验记录 | `README.md` |
 
-需求文档描述期望行为；架构文档描述当前方案；ADR 解释重要选择及原因；测试文档说明如何验证结论；原型仅用于参考，不得被生产代码依赖。
+## 文档职责
 
+- PRD 描述产品目标、范围和业务规则。
+- `prd/agenthub-v1.md` 是当前需求的唯一事实来源；其余 PRD 文件必须明确标记为历史来源或已并入总 PRD。
+- `architecture/overview.md` 描述已经存在的当前架构，是持续更新的现状文档。
+- `architecture/design.md` 描述当前准备采用的统一技术方案，需求稳定后更新，实现完成后与现状对齐。
+- ADR 只记录重要、难以逆转且存在真实取舍的技术决策；决策变化时新增 ADR 并标记旧 ADR 被取代。
+- BDD 使用业务语言描述外部可观察的验收行为。
+- `quality/testing.md` 说明单元、契约、集成、API、UI 和平台测试策略。
+- `quality/verification/` 保存某次真实验证运行的证据。
+- `process/roadmap.md` 保存阶段规划，`todo.md` 保存当前工作，`learnings.md` 按日期记录经验。
+- 原型仅用于参考，不得被生产代码依赖。
+
+## 推荐阅读顺序
+
+```text
+prd/agenthub-v1.md
+  -> architecture/design.md
+  -> architecture/adr/
+  -> quality/bdd/
+  -> quality/testing.md
+  -> process/roadmap.md
+```

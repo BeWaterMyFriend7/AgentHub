@@ -1,6 +1,6 @@
 # AgentHub
 
-AgentHub 是一个面向 Windows 本地环境的 AI 编码 Agent 管理台。当前 MVP 用于聚合 Codex、Claude Code、OpenCode 等工具的内部会话；下一阶段将增加 Skill、MCP Server 和插件管理能力。
+AgentHub 是一个面向 Windows、macOS、Linux 桌面环境的本地 AI 编码 Agent 管理台。当前 MVP 用于聚合 Codex、Claude Code、OpenCode 等工具的内部会话；下一阶段将增加 Skill、MCP Server 和 Agent 插件管理能力。
 
 ## 仓库结构
 
@@ -11,20 +11,19 @@ AgentHub/
 │   ├── agent_hub/            # 会话聚合应用
 │   └── skill_bridge/         # Skill 管理参考实现
 ├── docs/
-│   ├── requirements/         # 产品需求与范围
-│   ├── architecture/         # 当前架构与 ADR
-│   ├── testing/              # 测试策略与验证证据
-│   ├── prototypes/           # 非生产原型
+│   ├── prd/                  # 产品需求与范围
+│   ├── architecture/         # 当前架构、技术设计与 ADR
+│   ├── quality/              # BDD、测试策略与验证证据
+│   ├── process/              # 路线图、待办和经验
 │   ├── guides/               # 操作与开发指南
-│   ├── planning/             # 待办事项与路线图
-│   └── learnings/            # 按日期记录的经验
+│   └── prototypes/           # 非生产原型
 ├── scripts/                  # 维护与验证脚本
 ├── requirements.txt
 ├── start.bat
 └── start.sh
 ```
 
-修改产品行为或架构前，请先阅读 [`docs/README.md`](docs/README.md)。Skill、MCP 与插件管理方向记录在 [`docs/requirements/capability-management.md`](docs/requirements/capability-management.md)。
+修改产品行为或架构前，请先阅读 [`docs/README.md`](docs/README.md) 和总 PRD [`docs/prd/agenthub-v1.md`](docs/prd/agenthub-v1.md)。
 
 ## 运行 AgentHub
 
@@ -55,4 +54,3 @@ Set-Location src\skill_bridge
 ```
 
 服务监听 `http://127.0.0.1:17890`。它会执行真实的 Windows 文件系统操作，请先阅读操作手册，并优先使用测试目录验证。
-

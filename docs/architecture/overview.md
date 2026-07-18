@@ -11,7 +11,7 @@
   -> 原生 API、Hook、配置文件、CLI 或平台操作
 ```
 
-当前接近生产结构的代码只实现了基于 Mock Adapter 的会话聚合。`src/skill_bridge/` 是参考子系统，尚未接入 AgentHub 主进程。
+当前接近生产结构的代码只实现了基于 Mock Adapter 的会话聚合。`src/skill_bridge/` 是待合并的 Skill 参考子系统；最终只运行一个 AgentHub 应用。
 
 ## 目标模块
 
@@ -22,7 +22,8 @@
 - `plugins`：Manifest/Catalog 发现与原生生命周期操作。
 - `agents`：各工具适配器和能力矩阵。
 - `audit`：不可变操作记录与恢复元数据。
-- `platform`：Windows Junction/进程能力，以及后续 POSIX 平台适配器。
+- `platform`：Windows Junction、macOS/Linux Symbolic Link 和其他平台专属能力。
 
 UI 只消费归一化后的读取模型，不得直接解释原生配置文件或执行平台命令。
 
+目录链接只建立内容引用。链接完成后，Agent Adapter 负责执行原生配置、刷新或注册，并确认目标 Agent 已经加载能力。
