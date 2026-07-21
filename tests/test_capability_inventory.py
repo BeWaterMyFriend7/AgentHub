@@ -70,6 +70,10 @@ class CapabilityInventoryTests(unittest.TestCase):
                 first_capability.source.fingerprint,
                 second.capabilities[0].source.fingerprint,
             )
+            self.assertEqual(
+                first_capability.source.id,
+                second.capabilities[0].source.id,
+            )
 
     def test_shared_conflicting_and_missing_installations_form_one_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

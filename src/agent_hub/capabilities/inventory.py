@@ -234,7 +234,10 @@ class CapabilityInventory:
         }
         source = (
             CapabilitySource(
-                id=f"{capability_id}@{source_fingerprint[:16]}",
+                id=(
+                    f"{capability_id}@"
+                    f"{hashlib.sha256(os.fspath(source_path).encode('utf-8')).hexdigest()[:16]}"
+                ),
                 path=source_path,
                 fingerprint=source_fingerprint,
                 manifest_id=name,
