@@ -57,6 +57,12 @@ class FailingCreateLinkAdapter(FakeDirectoryLinkAdapter):
         raise OSError("模拟链接创建失败")
 
 
+class PartiallyFailingCreateLinkAdapter(FakeDirectoryLinkAdapter):
+    def create(self, target: Path, source: Path) -> None:
+        super().create(target, source)
+        raise OSError("链接已创建，但 Adapter 随后失败")
+
+
 class CapabilityOperationTests(unittest.TestCase):
     def test_share_real_directory_is_backed_up_and_can_be_rolled_back(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -100,6 +106,7 @@ class CapabilityOperationTests(unittest.TestCase):
             self.assertEqual(links.inspect(target).resolved_target, source.resolve())
             self.assertTrue(result.backup_path.joinpath("user.txt").is_file())
             self.assertEqual(len(audits.records), 1)
+            self.assertGreaterEqual(audits.write_count, len(plan.steps) + 2)
 
             rollback = manager.rollback(result.operation_id)
 
@@ -204,6 +211,44 @@ class CapabilityOperationTests(unittest.TestCase):
                     StepExecutionStatus.FAILED,
                     StepExecutionStatus.NOT_EXECUTED,
                 ],
+            )
+
+    def test_partial_create_failure_removes_created_link(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source_root = base / "sources"
+            agent_root = base / "agent-skills"
+            source = source_root / "reviewer"
+            target = agent_root / "reviewer"
+            source.mkdir(parents=True)
+            agent_root.mkdir(parents=True)
+            links = PartiallyFailingCreateLinkAdapter()
+            manager = CapabilityOperationManager(
+                link_adapter=links,
+                audit_log=InMemoryAuditLog(),
+                allowed_roots=[source_root, agent_root],
+                protected_roots=[source_root, agent_root],
+                backup_root=base / "backups",
+            )
+            plan = manager.plan(
+                OperationRequest(
+                    operation_type=OperationType.ENABLE_SHARED_INSTALLATION,
+                    capability_id="skill:reviewer",
+                    agent_id="opencode",
+                    source_path=source,
+                    target_path=target,
+                )
+            )
+
+            result = manager.execute(
+                plan,
+                Confirmation(plan_id=plan.id, confirmation_type=plan.confirmation_type),
+            )
+
+            self.assertEqual(result.status, OperationStatus.ROLLED_BACK)
+            self.assertEqual(
+                links.inspect(target).kind,
+                DirectoryEntryKind.MISSING,
             )
 
     def test_disable_shared_installation_removes_only_link_and_can_rollback(self) -> None:
@@ -376,6 +421,46 @@ class CapabilityOperationTests(unittest.TestCase):
                 )
             finally:
                 adapter.remove(escape, outside)
+
+    def test_preflight_rejects_outside_link_even_when_it_points_inside(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source_root = base / "sources"
+            agent_root = base / "agent-skills"
+            outside_root = base / "outside"
+            source = source_root / "reviewer"
+            outside_link = outside_root / "reviewer"
+            source.mkdir(parents=True)
+            agent_root.mkdir(parents=True)
+            outside_root.mkdir()
+            adapter = current_directory_link_adapter()
+            adapter.create(outside_link, source)
+            try:
+                manager = CapabilityOperationManager(
+                    link_adapter=adapter,
+                    audit_log=InMemoryAuditLog(),
+                    allowed_roots=[source_root, agent_root],
+                    protected_roots=[source_root, agent_root],
+                    backup_root=base / "backups",
+                )
+
+                plan = manager.plan(
+                    OperationRequest(
+                        operation_type=OperationType.DISABLE_SHARED_INSTALLATION,
+                        capability_id="skill:reviewer",
+                        agent_id="opencode",
+                        source_path=source,
+                        target_path=outside_link,
+                    )
+                )
+
+                self.assertFalse(plan.ready)
+                self.assertIn(
+                    "PATH_OUTSIDE_ALLOWED_ROOT",
+                    {issue.code for issue in plan.issues},
+                )
+            finally:
+                adapter.remove(outside_link, source)
 
 
 if __name__ == "__main__":

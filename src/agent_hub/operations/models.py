@@ -40,6 +40,7 @@ class OperationStepType(StrEnum):
 
 
 class OperationStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
     SUCCEEDED = "succeeded"
     REJECTED = "rejected"
     FAILED = "failed"

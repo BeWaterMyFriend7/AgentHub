@@ -136,7 +136,7 @@ class CapabilityInventoryTests(unittest.TestCase):
             self.assertEqual(states["missing"], InstallationState.MISSING)
             self.assertEqual(capability.source.path, source.resolve())
 
-    def test_same_name_with_distinct_content_is_not_assigned_a_source(self) -> None:
+    def test_same_name_with_distinct_content_is_split_by_source_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
             first_root = base / "first"

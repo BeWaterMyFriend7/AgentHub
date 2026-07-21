@@ -12,7 +12,7 @@
 - [x] 第一阶段：拆出 `agents` 与 `sessions`，建立 `AgentRegistry`、`SessionHub` 和应用组合入口。
 - [x] 第一阶段：保留旧 Python 导入路径和 `/api/tools` 兼容入口，前端切换到 `/api/agents`。
 - [x] 第二阶段：从 SkillBridge 提取只读发现、解析和状态聚合，建立 `capabilities` 代码模块。
-- [x] 第三阶段：提取预检、目录链接、备份、回滚和审计，建立 `operations` 代码模块。
+- [x] 第三阶段（基础模块）：提取路径预检、目录链接、备份、回滚和审计；身份、所有权与兼容性待真实 Adapter 接入。
 - [ ] 第四阶段：真实 Adapter 与新模块稳定后，删除第一阶段兼容层和旧 `/api/tools` 入口。
 
 ## 会话接入

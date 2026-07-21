@@ -51,7 +51,10 @@ class CapabilityOperationManager:
     ) -> None:
         self._link_adapter = link_adapter
         self._audit_log = audit_log
-        self._allowed_roots = [resolved_path(path) for path in allowed_roots]
+        self._lexical_allowed_roots = [
+            normalized_path(path) for path in allowed_roots
+        ]
+        self._resolved_allowed_roots = [resolved_path(path) for path in allowed_roots]
         self._protected_roots = {normalized_path(path) for path in protected_roots}
         self._resolved_protected_roots = {
             resolved_path(path) for path in protected_roots
@@ -128,30 +131,35 @@ class CapabilityOperationManager:
             )
 
         completed: list[OperationStep] = []
-        step_results: list[OperationStepResult] = []
+        step_results = [
+            OperationStepResult(
+                step_type=step.step_type,
+                status=StepExecutionStatus.NOT_EXECUTED,
+            )
+            for step in plan.steps
+        ]
         backup_path: Path | None = None
+        self._write_audit(
+            plan,
+            OperationStatus.IN_PROGRESS,
+            "操作已开始。",
+            backup_path,
+            "",
+            step_results,
+        )
         for index, step in enumerate(plan.steps):
             if step.step_type == OperationStepType.BACKUP_DIRECTORY:
                 backup_path = step.target
             try:
                 self._execute_step(step)
             except Exception as error:
-                step_results.append(
-                    OperationStepResult(
-                        step_type=step.step_type,
-                        status=StepExecutionStatus.FAILED,
-                        error=str(error),
-                    )
-                )
-                step_results.extend(
-                    OperationStepResult(
-                        step_type=pending.step_type,
-                        status=StepExecutionStatus.NOT_EXECUTED,
-                    )
-                    for pending in plan.steps[index + 1 :]
+                step_results[index] = OperationStepResult(
+                    step_type=step.step_type,
+                    status=StepExecutionStatus.FAILED,
+                    error=str(error),
                 )
                 rollback_error, compensated = self._reverse_steps(
-                    completed,
+                    [*completed, step],
                     backup_path,
                 )
                 for result in step_results:
@@ -180,11 +188,17 @@ class CapabilityOperationManager:
                     step_results=step_results,
                 )
             completed.append(step)
-            step_results.append(
-                OperationStepResult(
-                    step_type=step.step_type,
-                    status=StepExecutionStatus.SUCCEEDED,
-                )
+            step_results[index] = OperationStepResult(
+                step_type=step.step_type,
+                status=StepExecutionStatus.SUCCEEDED,
+            )
+            self._write_audit(
+                plan,
+                OperationStatus.IN_PROGRESS,
+                f"已完成步骤：{step.step_type.value}",
+                backup_path,
+                "",
+                step_results,
             )
 
         return self._finish(
@@ -460,6 +474,31 @@ class CapabilityOperationManager:
             )
             for step in plan.steps
         ]
+        self._write_audit(
+            plan,
+            status,
+            message,
+            backup_path,
+            error,
+            final_step_results,
+        )
+        return OperationResult(
+            operation_id=plan.id,
+            status=status,
+            message=message,
+            backup_path=backup_path,
+            error=error,
+        )
+
+    def _write_audit(
+        self,
+        plan: OperationPlan,
+        status: OperationStatus,
+        message: str,
+        backup_path: Path | None,
+        error: str,
+        step_results: list[OperationStepResult],
+    ) -> None:
         try:
             after_state = self._link_adapter.inspect(plan.request.target_path).kind
         except Exception:
@@ -478,26 +517,28 @@ class CapabilityOperationManager:
                 before_state=plan.before_state,
                 after_state=after_state,
                 status=status,
-                step_results=final_step_results,
+                step_results=step_results,
                 backup_path=backup_path,
                 error=error,
                 recovery_message=message,
                 created_at=datetime.now(timezone.utc),
             )
         )
-        return OperationResult(
-            operation_id=plan.id,
-            status=status,
-            message=message,
-            backup_path=backup_path,
-            error=error,
-        )
 
     def _is_allowed(self, path: Path) -> bool:
-        physical = resolved_path(path)
-        for root in self._allowed_roots:
+        return self._is_within(
+            normalized_path(path),
+            self._lexical_allowed_roots,
+        ) and self._is_within(
+            resolved_path(path),
+            self._resolved_allowed_roots,
+        )
+
+    @staticmethod
+    def _is_within(path: Path, roots: list[Path]) -> bool:
+        for root in roots:
             try:
-                if os.path.commonpath([physical, root]) == str(root):
+                if os.path.commonpath([path, root]) == str(root):
                     return True
             except ValueError:
                 continue
