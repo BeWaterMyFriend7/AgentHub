@@ -1,6 +1,6 @@
 # AgentHub
 
-AgentHub 是一个面向 Windows、macOS、Linux 桌面环境的本地 AI 编码 Agent 管理台。当前 MVP 用于聚合 Codex、Claude Code、OpenCode 等工具的内部会话；下一阶段将增加 Skill、MCP Server 和 Agent 插件管理能力。
+AgentHub 是面向 Windows、macOS、Linux 桌面环境的本地 AI Agent 管理中枢。当前 MVP 用于聚合 Codex、Claude Code、OpenCode 等工具的内部会话；后续在同一应用内增加 Skill、MCP Server 和 Agent 插件管理。
 
 ## 仓库结构
 
@@ -8,12 +8,12 @@ AgentHub 是一个面向 Windows、macOS、Linux 桌面环境的本地 AI 编码
 AgentHub/
 ├── agent.md                  # 项目约定与 Agent 协作规则
 ├── src/
-│   ├── agent_hub/            # 会话聚合应用
+│   ├── agent_hub/            # 当前会话聚合应用
 │   └── skill_bridge/         # Skill 管理参考实现
 ├── docs/
-│   ├── prd/                  # 产品需求与范围
-│   ├── architecture/         # 当前架构、技术设计与 ADR
-│   ├── quality/              # BDD、测试策略与验证证据
+│   ├── prd/                  # 全局产品需求与范围
+│   ├── architecture/         # 系统架构、系统级设计与 ADR
+│   ├── modules/              # 各模块的需求、设计、BDD、测试与验证
 │   ├── process/              # 路线图、待办和经验
 │   ├── guides/               # 操作与开发指南
 │   └── prototypes/           # 非生产原型
@@ -23,7 +23,7 @@ AgentHub/
 └── start.sh
 ```
 
-修改产品行为或架构前，请先阅读 [`docs/README.md`](docs/README.md) 和总 PRD [`docs/prd/agenthub-v1.md`](docs/prd/agenthub-v1.md)。
+修改产品行为或架构前，先阅读[文档索引](./docs/README.md)和[总 PRD](./docs/prd/agenthub-v1.md)。
 
 ## 运行 AgentHub
 
@@ -46,11 +46,4 @@ $env:PYTHONPATH = "$PWD\src"
 
 ## SkillBridge 参考实现
 
-`src/skill_bridge/` 保存已有的 Skill 管理实现及其技术说明。可独立运行：
-
-```powershell
-Set-Location src\skill_bridge
-..\..\.venv\Scripts\python.exe main.py
-```
-
-服务监听 `http://127.0.0.1:17890`。它会执行真实的 Windows 文件系统操作，请先阅读操作手册，并优先使用测试目录验证。
+`src/skill_bridge/` 保存已有的 Skill 发现、共享和安全操作实现。它只作为待合并的参考子系统，不再作为独立产品发展。操作前请阅读[操作手册](./docs/guides/skill-bridge-operations.md)，并优先使用测试目录验证。

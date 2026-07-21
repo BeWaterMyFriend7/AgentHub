@@ -9,6 +9,15 @@ AgentHub 是面向 Windows、macOS、Linux 主流桌面操作系统的本地 AI 
 1. 用户同时运行多个 Agent 时，集中发现需要介入的内部会话，并精确回到原生会话。
 2. 用户在多个 Agent 之间复用能力时，集中查看真实安装状态，并以安全、可审计、可恢复的方式共享和管理能力。
 
+## 模块细化索引
+
+总 PRD 维护唯一产品口径，模块文档只细化所属范围：
+
+- [Agents](../modules/agents/requirements.md)：Agent 身份、安装、Profile 与 Adapter 能力。
+- [Sessions](../modules/sessions/requirements.md)：会话发现、状态、待处理和精确恢复。
+- [Capabilities](../modules/capabilities/requirements.md)：Skill、MCP Server、Agent 插件的统一模型和类型规则。
+- [Operations](../modules/operations/requirements.md)：共享、卸载、来源删除、备份、回滚和审计。
+
 ## 2. V1 边界
 
 ### 2.1 包含
