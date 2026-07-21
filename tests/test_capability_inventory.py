@@ -121,7 +121,11 @@ class CapabilityInventoryTests(unittest.TestCase):
                 locations,
                 source_paths={"skill:reviewer": source},
             )
-            capability = result.capabilities[0]
+            capability = next(
+                item
+                for item in result.capabilities
+                if item.source is not None and item.source.path == source.resolve()
+            )
             states = {
                 item.agent_id: item.state for item in capability.installations
             }
@@ -159,11 +163,15 @@ class CapabilityInventoryTests(unittest.TestCase):
             )
             capability = result.capabilities[0]
 
-            self.assertTrue(capability.identity_conflict)
-            self.assertIsNone(capability.source)
+            self.assertEqual(len(result.capabilities), 2)
+            self.assertEqual(len({item.id for item in result.capabilities}), 2)
+            self.assertTrue(all(item.identity_conflict for item in result.capabilities))
             self.assertEqual(
-                {item.state for item in capability.installations},
-                {InstallationState.CONFLICT},
+                {item.source.path for item in result.capabilities if item.source},
+                {
+                    (first_root / "reviewer").resolve(),
+                    (second_root / "reviewer").resolve(),
+                },
             )
 
 

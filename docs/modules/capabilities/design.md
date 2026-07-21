@@ -41,7 +41,7 @@ Skill、MCP Server 和 Agent 插件是同一公共模型下的三种能力类型
 ## 当前实现
 
 - `src/agent_hub/capabilities/models.py`：统一能力、来源、Agent 安装、目录状态和原生加载状态模型。
-- `src/agent_hub/capabilities/inventory.py`：通过一次 `discover` 完成 Skill Manifest 解析、内容指纹、来源推断、同名冲突和 Agent 状态矩阵聚合。
+- `src/agent_hub/capabilities/inventory.py`：通过一次 `discover` 完成 Skill Manifest 解析、内容指纹、来源推断、同名多来源拆分和 Agent 状态矩阵聚合。来源 ID 由来源路径稳定标识，内容版本只进入 fingerprint。
 - `src/agent_hub/platform/links.py`：为扫描提供目录、目录链接、断链和无效路径的统一识别。
 
 当前只迁移 Skill 的只读发现与状态聚合。MCP Server、Agent 插件、原生加载验证、HTTP API 与 UI 仍属于后续功能，不以公共模型已经存在为完成证据。

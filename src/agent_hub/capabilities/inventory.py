@@ -104,15 +104,16 @@ class CapabilityInventory:
         for item in discovered:
             grouped[item.name].append(item)
 
-        capabilities = [
-            self._build_skill(
-                name,
-                items,
-                locations,
-                selected_sources.get(f"skill:{name}"),
+        capabilities: list[Capability] = []
+        for name, items in grouped.items():
+            capabilities.extend(
+                self._build_skill_variants(
+                    name,
+                    items,
+                    locations,
+                    selected_sources.get(f"skill:{name}"),
+                )
             )
-            for name, items in grouped.items()
-        ]
         capabilities.sort(key=lambda item: (item.capability_type, item.name.lower()))
         return CapabilityMatrix(capabilities=capabilities, locations=locations)
 
@@ -173,15 +174,44 @@ class CapabilityInventory:
                 )
         return results
 
-    def _build_skill(
+    def _build_skill_variants(
         self,
         name: str,
         discovered: list[_DiscoveredSkill],
         locations: list[CapabilityLocation],
         selected_source: Path | None,
+    ) -> list[Capability]:
+        source_paths = self._source_candidates(discovered, selected_source)
+        if not source_paths:
+            return [
+                self._build_skill_variant(
+                    name,
+                    discovered,
+                    locations,
+                    source_path=None,
+                    identity_conflict=False,
+                )
+            ]
+        identity_conflict = len(source_paths) > 1
+        return [
+            self._build_skill_variant(
+                name,
+                discovered,
+                locations,
+                source_path=source_path,
+                identity_conflict=identity_conflict,
+            )
+            for source_path in source_paths
+        ]
+
+    def _build_skill_variant(
+        self,
+        name: str,
+        discovered: list[_DiscoveredSkill],
+        locations: list[CapabilityLocation],
+        source_path: Path | None,
+        identity_conflict: bool,
     ) -> Capability:
-        capability_id = f"skill:{name}"
-        source_path = selected_source or self._infer_source(discovered)
         source_fingerprint = ""
         if source_path is not None:
             matching = next(
@@ -194,12 +224,20 @@ class CapabilityInventory:
                 else _content_fingerprint(source_path)
             )
 
-        by_agent = {item.location.agent_id: item for item in discovered}
         installations: list[CapabilityInstallation] = []
         for location in locations:
             if location.capability_type != CapabilityType.SKILL:
                 continue
-            item = by_agent.get(location.agent_id)
+            agent_items = [
+                item
+                for item in discovered
+                if item.location.agent_id == location.agent_id
+            ]
+            item = self._select_variant_installation(
+                agent_items,
+                source_path,
+                source_fingerprint,
+            )
             if item is None:
                 installations.append(
                     CapabilityInstallation(
@@ -226,18 +264,15 @@ class CapabilityInventory:
                 )
             )
 
-        fingerprints = {
-            item.fingerprint
-            for item in discovered
-            if item.entry_kind == DirectoryEntryKind.REAL_DIRECTORY
-            and item.fingerprint
-        }
+        source_identity = (
+            hashlib.sha256(os.fspath(source_path).encode("utf-8")).hexdigest()[:16]
+            if source_path is not None
+            else "unresolved"
+        )
+        capability_id = f"skill:{name}@{source_identity}"
         source = (
             CapabilitySource(
-                id=(
-                    f"{capability_id}@"
-                    f"{hashlib.sha256(os.fspath(source_path).encode('utf-8')).hexdigest()[:16]}"
-                ),
+                id=f"source:{source_identity}",
                 path=source_path,
                 fingerprint=source_fingerprint,
                 manifest_id=name,
@@ -245,10 +280,7 @@ class CapabilityInventory:
             if source_path is not None
             else None
         )
-        description = next(
-            (item.description for item in discovered if item.description),
-            "",
-        )
+        description = self._variant_description(discovered, source_path)
         return Capability(
             id=capability_id,
             capability_type=CapabilityType.SKILL,
@@ -256,23 +288,112 @@ class CapabilityInventory:
             description=description,
             source=source,
             installations=installations,
-            identity_conflict=source_path is None and len(fingerprints) > 1,
+            identity_conflict=identity_conflict,
         )
 
     @staticmethod
-    def _infer_source(discovered: list[_DiscoveredSkill]) -> Path | None:
+    def _source_candidates(
+        discovered: list[_DiscoveredSkill],
+        selected_source: Path | None,
+    ) -> list[Path]:
         real_directories = [
             item
             for item in discovered
             if item.entry_kind == DirectoryEntryKind.REAL_DIRECTORY
             and item.has_manifest
         ]
-        if len(real_directories) == 1:
-            return real_directories[0].path
-        fingerprints = {item.fingerprint for item in real_directories if item.fingerprint}
-        if real_directories and len(fingerprints) == 1:
-            return sorted(real_directories, key=lambda item: str(item.path))[0].path
-        return None
+        candidates: list[Path] = []
+        known_fingerprints: set[str] = set()
+        if selected_source is not None:
+            candidates.append(selected_source)
+            selected_item = next(
+                (item for item in discovered if item.path == selected_source),
+                None,
+            )
+            selected_fingerprint = (
+                selected_item.fingerprint
+                if selected_item is not None
+                else _content_fingerprint(selected_source)
+            )
+            if selected_fingerprint:
+                known_fingerprints.add(selected_fingerprint)
+
+        for item in sorted(real_directories, key=lambda entry: str(entry.path)):
+            if item.path in candidates:
+                continue
+            if item.fingerprint and item.fingerprint in known_fingerprints:
+                continue
+            candidates.append(item.path)
+            if item.fingerprint:
+                known_fingerprints.add(item.fingerprint)
+
+        for item in discovered:
+            resolved = item.resolved_source
+            if (
+                item.entry_kind == DirectoryEntryKind.DIRECTORY_LINK
+                and resolved is not None
+                and resolved.is_dir()
+                and resolved not in candidates
+            ):
+                fingerprint = item.fingerprint or _content_fingerprint(resolved)
+                if fingerprint and fingerprint in known_fingerprints:
+                    continue
+                candidates.append(resolved)
+                if fingerprint:
+                    known_fingerprints.add(fingerprint)
+        return candidates
+
+    @staticmethod
+    def _select_variant_installation(
+        items: list[_DiscoveredSkill],
+        source_path: Path | None,
+        source_fingerprint: str,
+    ) -> _DiscoveredSkill | None:
+        if not items:
+            return None
+        if source_path is None:
+            return items[0]
+        exact = next((item for item in items if item.path == source_path), None)
+        if exact is not None:
+            return exact
+        shared = next(
+            (item for item in items if item.resolved_source == source_path),
+            None,
+        )
+        if shared is not None:
+            return shared
+        matching_copy = next(
+            (
+                item
+                for item in items
+                if source_fingerprint
+                and item.fingerprint == source_fingerprint
+                and item.entry_kind == DirectoryEntryKind.REAL_DIRECTORY
+            ),
+            None,
+        )
+        return matching_copy or items[0]
+
+    @staticmethod
+    def _variant_description(
+        discovered: list[_DiscoveredSkill],
+        source_path: Path | None,
+    ) -> str:
+        if source_path is not None:
+            source_item = next(
+                (
+                    item
+                    for item in discovered
+                    if item.path == source_path and item.description
+                ),
+                None,
+            )
+            if source_item is not None:
+                return source_item.description
+        return next(
+            (item.description for item in discovered if item.description),
+            "",
+        )
 
     @staticmethod
     def _installation_state(

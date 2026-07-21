@@ -6,6 +6,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from agent_hub.platform.links import DirectoryEntryKind
+
 
 class OperationType(StrEnum):
     ENABLE_SHARED_INSTALLATION = "enable_shared_installation"
@@ -45,12 +47,20 @@ class OperationStatus(StrEnum):
     MANUAL_RECOVERY_REQUIRED = "manual_recovery_required"
 
 
+class StepExecutionStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    NOT_EXECUTED = "not_executed"
+    COMPENSATED = "compensated"
+
+
 class OperationRequest(BaseModel):
     operation_type: OperationType
     capability_id: str
     agent_id: str
     source_path: Path
     target_path: Path
+    operator: str = "local-user"
 
 
 class PreflightIssue(BaseModel):
@@ -65,6 +75,12 @@ class OperationStep(BaseModel):
     target: Path
 
 
+class OperationStepResult(BaseModel):
+    step_type: OperationStepType
+    status: StepExecutionStatus
+    error: str = ""
+
+
 class OperationPlan(BaseModel):
     id: str
     request: OperationRequest
@@ -72,6 +88,8 @@ class OperationPlan(BaseModel):
     issues: list[PreflightIssue] = Field(default_factory=list)
     confirmation_type: ConfirmationType = ConfirmationType.INSTALLATION_CHANGE
     recovery_level: RecoveryLevel = RecoveryLevel.AUTOMATIC_ROLLBACK
+    before_state: DirectoryEntryKind = DirectoryEntryKind.MISSING
+    impact_summary: list[str] = Field(default_factory=list)
 
     @property
     def ready(self) -> bool:
@@ -96,8 +114,16 @@ class AuditRecord(BaseModel):
     capability_id: str
     agent_id: str
     operation_type: OperationType
+    operator: str
+    source_path: Path
+    target_path: Path
+    confirmation_type: ConfirmationType
+    recovery_level: RecoveryLevel
+    before_state: DirectoryEntryKind
+    after_state: DirectoryEntryKind
     status: OperationStatus
-    steps: list[OperationStepType] = Field(default_factory=list)
+    step_results: list[OperationStepResult] = Field(default_factory=list)
     backup_path: Path | None = None
     error: str = ""
+    recovery_message: str = ""
     created_at: datetime

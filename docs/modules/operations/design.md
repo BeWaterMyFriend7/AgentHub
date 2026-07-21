@@ -43,8 +43,8 @@
 ## 当前实现
 
 - `src/agent_hub/operations/models.py`：操作请求、计划、预检问题、步骤、确认、恢复等级、结果和审计模型。
-- `src/agent_hub/operations/manager.py`：通过 `plan/execute/rollback` Interface 统一共享安装的路径预检、真实目录备份、链接创建或移除、执行后验证和逆序恢复。
-- `src/agent_hub/operations/audit.py`：当前内存审计实现，后续可替换为持久化 Adapter。
+- `src/agent_hub/operations/manager.py`：通过 `plan/execute/rollback` Interface 统一物理路径预检、真实目录影响提示与备份、链接创建或移除、确认后重新预检、执行后验证和逆序恢复。
+- `src/agent_hub/operations/audit.py`：记录操作者、对象路径、前后状态、逐步结果和恢复信息的当前内存实现，后续可替换为持久化 Adapter。
 - `src/agent_hub/platform/links.py`：Windows Junction 与 macOS/Linux Symbolic Link Adapter。
 
 当前执行范围仅包括启用和停用共享安装。普通卸载、来源删除、永久清除、插件更新、原生 Agent 配置变更、并发锁与持久化审计尚未开放，不能通过当前 Interface 绕过。

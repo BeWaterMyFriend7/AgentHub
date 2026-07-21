@@ -12,8 +12,13 @@ from agent_hub.operations import (
     OperationRequest,
     OperationStatus,
     OperationType,
+    StepExecutionStatus,
 )
-from agent_hub.platform.links import DirectoryEntryKind, LinkInfo
+from agent_hub.platform.links import (
+    DirectoryEntryKind,
+    LinkInfo,
+    current_directory_link_adapter,
+)
 
 
 class FakeDirectoryLinkAdapter:
@@ -87,6 +92,10 @@ class CapabilityOperationTests(unittest.TestCase):
             )
 
             self.assertTrue(plan.ready)
+            self.assertIn(
+                "TARGET_LOCAL_CONTENT_WILL_BE_BACKED_UP",
+                {issue.code for issue in plan.issues},
+            )
             self.assertEqual(result.status, OperationStatus.SUCCEEDED)
             self.assertEqual(links.inspect(target).resolved_target, source.resolve())
             self.assertTrue(result.backup_path.joinpath("user.txt").is_file())
@@ -156,9 +165,10 @@ class CapabilityOperationTests(unittest.TestCase):
             source.mkdir(parents=True)
             target.mkdir(parents=True)
             target.joinpath("keep.txt").write_text("保留", encoding="utf-8")
+            audits = InMemoryAuditLog()
             manager = CapabilityOperationManager(
                 link_adapter=FailingCreateLinkAdapter(),
-                audit_log=InMemoryAuditLog(),
+                audit_log=audits,
                 allowed_roots=[source_root, agent_root],
                 protected_roots=[source_root, agent_root],
                 backup_root=base / "backups",
@@ -182,6 +192,18 @@ class CapabilityOperationTests(unittest.TestCase):
             self.assertEqual(
                 target.joinpath("keep.txt").read_text(encoding="utf-8"),
                 "保留",
+            )
+            record = audits.records[0]
+            self.assertEqual(record.operator, "local-user")
+            self.assertEqual(record.before_state, DirectoryEntryKind.REAL_DIRECTORY)
+            self.assertEqual(record.after_state, DirectoryEntryKind.REAL_DIRECTORY)
+            self.assertEqual(
+                [item.status for item in record.step_results],
+                [
+                    StepExecutionStatus.COMPENSATED,
+                    StepExecutionStatus.FAILED,
+                    StepExecutionStatus.NOT_EXECUTED,
+                ],
             )
 
     def test_disable_shared_installation_removes_only_link_and_can_rollback(self) -> None:
@@ -272,6 +294,88 @@ class CapabilityOperationTests(unittest.TestCase):
                 target.joinpath("new.txt").read_text(encoding="utf-8"),
                 "外部新增",
             )
+
+    def test_rollback_reports_manual_recovery_when_target_is_occupied(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source_root = base / "sources"
+            agent_root = base / "agent-skills"
+            source = source_root / "reviewer"
+            target = agent_root / "reviewer"
+            source.mkdir(parents=True)
+            agent_root.mkdir(parents=True)
+            links = FakeDirectoryLinkAdapter()
+            links.create(target, source)
+            manager = CapabilityOperationManager(
+                link_adapter=links,
+                audit_log=InMemoryAuditLog(),
+                allowed_roots=[source_root, agent_root],
+                protected_roots=[source_root, agent_root],
+                backup_root=base / "backups",
+            )
+            plan = manager.plan(
+                OperationRequest(
+                    operation_type=OperationType.DISABLE_SHARED_INSTALLATION,
+                    capability_id="skill:reviewer",
+                    agent_id="opencode",
+                    source_path=source,
+                    target_path=target,
+                )
+            )
+            result = manager.execute(
+                plan,
+                Confirmation(plan_id=plan.id, confirmation_type=plan.confirmation_type),
+            )
+            target.mkdir()
+            target.joinpath("external.txt").write_text("外部内容", encoding="utf-8")
+
+            rollback = manager.rollback(result.operation_id)
+
+            self.assertEqual(
+                rollback.status,
+                OperationStatus.MANUAL_RECOVERY_REQUIRED,
+            )
+            self.assertTrue(target.joinpath("external.txt").is_file())
+
+    def test_preflight_resolves_parent_links_before_allowed_root_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source_root = base / "sources"
+            agent_root = base / "agent-skills"
+            outside = base / "outside"
+            source = source_root / "reviewer"
+            escape = agent_root / "escape"
+            source.mkdir(parents=True)
+            agent_root.mkdir(parents=True)
+            outside.mkdir()
+            adapter = current_directory_link_adapter()
+            adapter.create(escape, outside)
+            try:
+                manager = CapabilityOperationManager(
+                    link_adapter=adapter,
+                    audit_log=InMemoryAuditLog(),
+                    allowed_roots=[source_root, agent_root],
+                    protected_roots=[source_root, agent_root],
+                    backup_root=base / "backups",
+                )
+
+                plan = manager.plan(
+                    OperationRequest(
+                        operation_type=OperationType.ENABLE_SHARED_INSTALLATION,
+                        capability_id="skill:reviewer",
+                        agent_id="opencode",
+                        source_path=source,
+                        target_path=escape / "reviewer",
+                    )
+                )
+
+                self.assertFalse(plan.ready)
+                self.assertIn(
+                    "PATH_OUTSIDE_ALLOWED_ROOT",
+                    {issue.code for issue in plan.issues},
+                )
+            finally:
+                adapter.remove(escape, outside)
 
 
 if __name__ == "__main__":

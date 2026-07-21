@@ -5,6 +5,7 @@ from agent_hub.platform.links import (
     PosixSymbolicLinkAdapter,
     WindowsJunctionAdapter,
     current_directory_link_adapter,
+    resolved_path,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "PosixSymbolicLinkAdapter",
     "WindowsJunctionAdapter",
     "current_directory_link_adapter",
+    "resolved_path",
 ]

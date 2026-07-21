@@ -17,14 +17,17 @@ from agent_hub.operations.models import (
     OperationResult,
     OperationStatus,
     OperationStep,
+    OperationStepResult,
     OperationStepType,
     OperationType,
     PreflightIssue,
+    StepExecutionStatus,
 )
 from agent_hub.platform.links import (
     DirectoryEntryKind,
     DirectoryLinkAdapter,
     normalized_path,
+    resolved_path,
 )
 
 
@@ -48,8 +51,11 @@ class CapabilityOperationManager:
     ) -> None:
         self._link_adapter = link_adapter
         self._audit_log = audit_log
-        self._allowed_roots = [normalized_path(path) for path in allowed_roots]
+        self._allowed_roots = [resolved_path(path) for path in allowed_roots]
         self._protected_roots = {normalized_path(path) for path in protected_roots}
+        self._resolved_protected_roots = {
+            resolved_path(path) for path in protected_roots
+        }
         self._backup_root = normalized_path(backup_root)
         self._executed: dict[str, _ExecutedOperation] = {}
 
@@ -62,6 +68,7 @@ class CapabilityOperationManager:
             }
         )
         issues = self._preflight(normalized_request)
+        before_info = self._link_adapter.inspect(normalized_request.target_path)
         steps: list[OperationStep] = []
         if not any(issue.severity == IssueSeverity.ERROR for issue in issues):
             steps, step_issues = self._build_steps(plan_id, normalized_request)
@@ -71,6 +78,12 @@ class CapabilityOperationManager:
             request=normalized_request,
             steps=steps,
             issues=issues,
+            before_state=before_info.kind,
+            impact_summary=[
+                issue.message
+                for issue in issues
+                if issue.severity == IssueSeverity.WARNING
+            ],
         )
 
     def execute(
@@ -115,43 +128,63 @@ class CapabilityOperationManager:
             )
 
         completed: list[OperationStep] = []
+        step_results: list[OperationStepResult] = []
         backup_path: Path | None = None
-        try:
-            for step in plan.steps:
-                if step.step_type == OperationStepType.BACKUP_DIRECTORY:
-                    backup_path = step.target
-                    backup_path.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(step.source), str(backup_path))
-                elif step.step_type == OperationStepType.CREATE_DIRECTORY_LINK:
-                    self._link_adapter.create(step.target, step.source)
-                elif step.step_type == OperationStepType.VERIFY_DIRECTORY_LINK:
-                    info = self._link_adapter.inspect(step.target)
+        for index, step in enumerate(plan.steps):
+            if step.step_type == OperationStepType.BACKUP_DIRECTORY:
+                backup_path = step.target
+            try:
+                self._execute_step(step)
+            except Exception as error:
+                step_results.append(
+                    OperationStepResult(
+                        step_type=step.step_type,
+                        status=StepExecutionStatus.FAILED,
+                        error=str(error),
+                    )
+                )
+                step_results.extend(
+                    OperationStepResult(
+                        step_type=pending.step_type,
+                        status=StepExecutionStatus.NOT_EXECUTED,
+                    )
+                    for pending in plan.steps[index + 1 :]
+                )
+                rollback_error, compensated = self._reverse_steps(
+                    completed,
+                    backup_path,
+                )
+                for result in step_results:
                     if (
-                        info.kind != DirectoryEntryKind.DIRECTORY_LINK
-                        or info.resolved_target is None
-                        or normalized_path(info.resolved_target)
-                        != normalized_path(step.source)
+                        result.status == StepExecutionStatus.SUCCEEDED
+                        and result.step_type in compensated
                     ):
-                        raise OSError("目录链接创建后验证失败")
-                elif step.step_type == OperationStepType.REMOVE_DIRECTORY_LINK:
-                    self._link_adapter.remove(step.target, step.source)
-                completed.append(step)
-        except Exception as error:
-            rollback_error = self._reverse_steps(completed, backup_path)
-            status = (
-                OperationStatus.ROLLED_BACK
-                if rollback_error is None
-                else OperationStatus.MANUAL_RECOVERY_REQUIRED
-            )
-            return self._finish(
-                plan,
-                status,
-                "操作失败，已回滚。"
-                if rollback_error is None
-                else "操作失败，自动回滚不完整，需要人工恢复。",
-                backup_path=backup_path,
-                error=str(error) if rollback_error is None else f"{error}; {rollback_error}",
-                completed=completed,
+                        result.status = StepExecutionStatus.COMPENSATED
+                status = (
+                    OperationStatus.ROLLED_BACK
+                    if rollback_error is None
+                    else OperationStatus.MANUAL_RECOVERY_REQUIRED
+                )
+                return self._finish(
+                    plan,
+                    status,
+                    "操作失败，已回滚。"
+                    if rollback_error is None
+                    else "操作失败，自动回滚不完整，需要人工恢复。",
+                    backup_path=backup_path,
+                    error=(
+                        str(error)
+                        if rollback_error is None
+                        else f"{error}; {rollback_error}"
+                    ),
+                    step_results=step_results,
+                )
+            completed.append(step)
+            step_results.append(
+                OperationStepResult(
+                    step_type=step.step_type,
+                    status=StepExecutionStatus.SUCCEEDED,
+                )
             )
 
         return self._finish(
@@ -159,7 +192,7 @@ class CapabilityOperationManager:
             OperationStatus.SUCCEEDED,
             "能力安装变更完成。",
             backup_path=backup_path,
-            completed=completed,
+            step_results=step_results,
         )
 
     def rollback(self, operation_id: str) -> OperationResult:
@@ -179,7 +212,21 @@ class CapabilityOperationManager:
                 error="OPERATION_NOT_ROLLBACKABLE",
             )
 
-        error = self._reverse_steps(executed.plan.steps, executed.backup_path)
+        error, compensated = self._reverse_steps(
+            executed.plan.steps,
+            executed.backup_path,
+        )
+        rollback_results = [
+            OperationStepResult(
+                step_type=step.step_type,
+                status=(
+                    StepExecutionStatus.COMPENSATED
+                    if step.step_type in compensated
+                    else StepExecutionStatus.NOT_EXECUTED
+                ),
+            )
+            for step in executed.plan.steps
+        ]
         if error is not None:
             return self._finish(
                 executed.plan,
@@ -187,12 +234,14 @@ class CapabilityOperationManager:
                 "回滚不完整，需要人工恢复。",
                 backup_path=executed.backup_path,
                 error=error,
+                step_results=rollback_results,
             )
         return self._finish(
             executed.plan,
             OperationStatus.ROLLED_BACK,
             "操作已回滚。",
             backup_path=executed.backup_path,
+            step_results=rollback_results,
         )
 
     def _preflight(self, request: OperationRequest) -> list[PreflightIssue]:
@@ -208,7 +257,10 @@ class CapabilityOperationManager:
                         message=f"{label}路径超出允许范围：{path}",
                     )
                 )
-        if request.target_path in self._protected_roots:
+        if (
+            request.target_path in self._protected_roots
+            or resolved_path(request.target_path) in self._resolved_protected_roots
+        ):
             issues.append(
                 PreflightIssue(
                     code="PROTECTED_ROOT",
@@ -249,6 +301,16 @@ class CapabilityOperationManager:
         if request.operation_type == OperationType.ENABLE_SHARED_INSTALLATION:
             if info.kind == DirectoryEntryKind.REAL_DIRECTORY:
                 backup = self._backup_root / plan_id / request.target_path.name
+                issues.append(
+                    PreflightIssue(
+                        code="TARGET_LOCAL_CONTENT_WILL_BE_BACKED_UP",
+                        message=(
+                            "目标存在真实目录或用户修改；确认后将先隔离备份，"
+                            f"再建立共享安装：{request.target_path}"
+                        ),
+                        severity=IssueSeverity.WARNING,
+                    )
+                )
                 steps.append(
                     OperationStep(
                         step_type=OperationStepType.BACKUP_DIRECTORY,
@@ -315,15 +377,38 @@ class CapabilityOperationManager:
             )
         return steps, issues
 
+    def _execute_step(self, step: OperationStep) -> None:
+        if step.source is None:
+            raise ValueError(f"操作步骤缺少来源：{step.step_type}")
+        if step.step_type == OperationStepType.BACKUP_DIRECTORY:
+            step.target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(step.source), str(step.target))
+        elif step.step_type == OperationStepType.CREATE_DIRECTORY_LINK:
+            self._link_adapter.create(step.target, step.source)
+        elif step.step_type == OperationStepType.VERIFY_DIRECTORY_LINK:
+            info = self._link_adapter.inspect(step.target)
+            if (
+                info.kind != DirectoryEntryKind.DIRECTORY_LINK
+                or info.resolved_target is None
+                or normalized_path(info.resolved_target)
+                != normalized_path(step.source)
+            ):
+                raise OSError("目录链接创建后验证失败")
+        elif step.step_type == OperationStepType.REMOVE_DIRECTORY_LINK:
+            self._link_adapter.remove(step.target, step.source)
+
     def _reverse_steps(
         self,
         steps: list[OperationStep],
         backup_path: Path | None,
-    ) -> str | None:
+    ) -> tuple[str | None, list[OperationStepType]]:
+        compensated: list[OperationStepType] = []
         try:
             for step in reversed(steps):
                 if step.step_type == OperationStepType.VERIFY_DIRECTORY_LINK:
                     continue
+                if step.source is None:
+                    raise ValueError(f"补偿步骤缺少来源：{step.step_type}")
                 if step.step_type == OperationStepType.CREATE_DIRECTORY_LINK:
                     info = self._link_adapter.inspect(step.target)
                     if info.kind in {
@@ -331,17 +416,32 @@ class CapabilityOperationManager:
                         DirectoryEntryKind.BROKEN_LINK,
                     }:
                         self._link_adapter.remove(step.target, step.source)
+                    elif info.kind != DirectoryEntryKind.MISSING:
+                        raise FileExistsError(
+                            f"回滚目标已被外部内容占用：{step.target}"
+                        )
                 elif step.step_type == OperationStepType.BACKUP_DIRECTORY:
                     if backup_path is not None and backup_path.is_dir():
                         if os.path.lexists(step.source):
                             raise FileExistsError(f"恢复目标已存在：{step.source}")
                         shutil.move(str(backup_path), str(step.source))
                 elif step.step_type == OperationStepType.REMOVE_DIRECTORY_LINK:
-                    if self._link_adapter.inspect(step.target).kind == DirectoryEntryKind.MISSING:
+                    info = self._link_adapter.inspect(step.target)
+                    if info.kind == DirectoryEntryKind.MISSING:
                         self._link_adapter.create(step.target, step.source)
-            return None
+                    elif not (
+                        info.kind == DirectoryEntryKind.DIRECTORY_LINK
+                        and info.resolved_target is not None
+                        and normalized_path(info.resolved_target)
+                        == normalized_path(step.source)
+                    ):
+                        raise FileExistsError(
+                            f"回滚目标已被外部内容占用：{step.target}"
+                        )
+                compensated.append(step.step_type)
+            return None, compensated
         except Exception as error:
-            return str(error)
+            return str(error), compensated
 
     def _finish(
         self,
@@ -350,19 +450,38 @@ class CapabilityOperationManager:
         message: str,
         backup_path: Path | None = None,
         error: str = "",
-        completed: list[OperationStep] | None = None,
+        step_results: list[OperationStepResult] | None = None,
     ) -> OperationResult:
         self._executed[plan.id] = _ExecutedOperation(plan, backup_path, status)
+        final_step_results = step_results or [
+            OperationStepResult(
+                step_type=step.step_type,
+                status=StepExecutionStatus.NOT_EXECUTED,
+            )
+            for step in plan.steps
+        ]
+        try:
+            after_state = self._link_adapter.inspect(plan.request.target_path).kind
+        except Exception:
+            after_state = DirectoryEntryKind.INVALID
         self._audit_log.append(
             AuditRecord(
                 operation_id=plan.id,
                 capability_id=plan.request.capability_id,
                 agent_id=plan.request.agent_id,
                 operation_type=plan.request.operation_type,
+                operator=plan.request.operator,
+                source_path=plan.request.source_path,
+                target_path=plan.request.target_path,
+                confirmation_type=plan.confirmation_type,
+                recovery_level=plan.recovery_level,
+                before_state=plan.before_state,
+                after_state=after_state,
                 status=status,
-                steps=[step.step_type for step in (completed or plan.steps)],
+                step_results=final_step_results,
                 backup_path=backup_path,
                 error=error,
+                recovery_message=message,
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -375,10 +494,10 @@ class CapabilityOperationManager:
         )
 
     def _is_allowed(self, path: Path) -> bool:
-        normalized = normalized_path(path)
+        physical = resolved_path(path)
         for root in self._allowed_roots:
             try:
-                if os.path.commonpath([normalized, root]) == str(root):
+                if os.path.commonpath([physical, root]) == str(root):
                     return True
             except ValueError:
                 continue

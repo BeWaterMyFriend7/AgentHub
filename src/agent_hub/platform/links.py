@@ -27,6 +27,11 @@ def normalized_path(path: Path) -> Path:
     return Path(os.path.normcase(os.path.abspath(path)))
 
 
+def resolved_path(path: Path) -> Path:
+    """解析已存在的父级目录链接，并保留尚不存在的末级路径。"""
+    return Path(os.path.normcase(os.path.realpath(normalized_path(path))))
+
+
 class DirectoryLinkAdapter(ABC):
     """跨平台目录链接 seam；调用方不感知 Junction 与 Symbolic Link 差异。"""
 

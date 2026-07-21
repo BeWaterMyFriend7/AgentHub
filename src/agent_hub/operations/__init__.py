@@ -9,10 +9,12 @@ from agent_hub.operations.models import (
     OperationResult,
     OperationStatus,
     OperationStep,
+    OperationStepResult,
     OperationStepType,
     OperationType,
     PreflightIssue,
     RecoveryLevel,
+    StepExecutionStatus,
 )
 
 __all__ = [
@@ -26,8 +28,10 @@ __all__ = [
     "OperationResult",
     "OperationStatus",
     "OperationStep",
+    "OperationStepResult",
     "OperationStepType",
     "OperationType",
     "PreflightIssue",
     "RecoveryLevel",
+    "StepExecutionStatus",
 ]
