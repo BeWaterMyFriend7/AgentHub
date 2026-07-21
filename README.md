@@ -8,8 +8,8 @@ AgentHub 是面向 Windows、macOS、Linux 桌面环境的本地 AI Agent 管理
 AgentHub/
 ├── agent.md                  # 项目约定与 Agent 协作规则
 ├── src/
-│   ├── agent_hub/            # 当前会话聚合应用
-│   └── skill_bridge/         # Skill 管理参考实现
+│   ├── agent_hub/            # AgentHub 模块化单体实现
+│   └── skill_bridge/         # 已停止演进的 SkillBridge 参考实现
 ├── docs/
 │   ├── prd/                  # 全局产品需求与范围
 │   ├── architecture/         # 系统架构、系统级设计与 ADR
@@ -46,4 +46,4 @@ $env:PYTHONPATH = "$PWD\src"
 
 ## SkillBridge 参考实现
 
-`src/skill_bridge/` 保存已有的 Skill 发现、共享和安全操作实现。它只作为待合并的参考子系统，不再作为独立产品发展。操作前请阅读[操作手册](./docs/guides/skill-bridge-operations.md)，并优先使用测试目录验证。
+SkillBridge 的 Skill 扫描、状态聚合、目录共享、备份与回滚思路已经分别提取到 `agent_hub/capabilities`、`agent_hub/operations` 和 `agent_hub/platform`。`src/skill_bridge/` 仅保留为历史参考，不再作为独立产品发展或生产入口。

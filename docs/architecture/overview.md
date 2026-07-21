@@ -13,11 +13,11 @@
        └── demo/DemoSessionController（仅演示状态推进）
 ```
 
-当前接近生产结构的代码只实现了基于 Mock Adapter 的 Agent 接入和会话聚合。旧的 `models.py`、`service.py`、`repository.py`、`seed.py` 和 `adapters/` 暂时作为第一阶段迁移兼容层；新代码应直接使用 `agents/`、`sessions/` 和 `bootstrap.py`。
+当前代码已经形成模块化单体骨架：`agents` 与 `sessions` 进入应用运行时；`capabilities` 提供只读 Skill 发现与统一能力模型；`operations` 提供共享安装的预检、确认、备份、目录链接、验证、回滚与审计；`platform` 隐藏 Windows Junction 和 macOS/Linux Symbolic Link 差异。旧的会话 `models.py`、`service.py`、`repository.py`、`seed.py` 和 `adapters/` 暂时作为迁移兼容层。
 
 核心模型和新 API 统一使用 `agent_id`、`agent_name`；`tool_id` 等旧术语只保留在旧 Python 访问别名和 `/api/tools` 兼容边界中。Demo 状态推进由 `demo` 控制器编排，不属于生产 Session Adapter 契约。
 
-`src/skill_bridge/` 仍是待合并的 Skill 参考子系统；Capabilities 和 Operations 的代码模块将在提取真实逻辑时建立，不提前创建空壳。最终只运行一个 AgentHub 应用。
+`src/skill_bridge/` 已完成本轮领域逻辑提取，仅作为历史参考保留。Capabilities 与 Operations 暂未接入 HTTP API/UI，也尚未实现 MCP、插件、来源删除和持久化审计；这些功能继续在同一个 AgentHub 应用内迭代，不恢复独立 SkillBridge 应用。
 
 ## 目标模块化单体
 

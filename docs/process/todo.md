@@ -4,15 +4,15 @@
 
 - [x] 使用标准库 `unittest` 与 FastAPI `TestClient` 为 Agent Registry、会话聚合、API 响应和迁移兼容层建立基线测试。
 - [ ] 使用持久化的 Agent Adapter 配置替换纯 Mock 配置。
-- [ ] 将 SkillBridge 的成熟领域逻辑合并为 AgentHub 内部 Skill 模块。
-- [ ] 建立 Windows、macOS、Linux 平台文件链接适配接口。
+- [x] 将 SkillBridge 的 Skill 扫描、聚合、共享、备份与回滚逻辑提取到 AgentHub 模块。
+- [x] 建立 Windows Junction、macOS/Linux Symbolic Link 平台适配 Interface。
 
 ## 模块拆分实施
 
 - [x] 第一阶段：拆出 `agents` 与 `sessions`，建立 `AgentRegistry`、`SessionHub` 和应用组合入口。
 - [x] 第一阶段：保留旧 Python 导入路径和 `/api/tools` 兼容入口，前端切换到 `/api/agents`。
-- [ ] 第二阶段：从 SkillBridge 提取只读发现、解析和状态聚合，建立 `capabilities` 代码模块。
-- [ ] 第三阶段：提取预检、目录链接、备份、回滚和审计，建立 `operations` 代码模块。
+- [x] 第二阶段：从 SkillBridge 提取只读发现、解析和状态聚合，建立 `capabilities` 代码模块。
+- [x] 第三阶段：提取预检、目录链接、备份、回滚和审计，建立 `operations` 代码模块。
 - [ ] 第四阶段：真实 Adapter 与新模块稳定后，删除第一阶段兼容层和旧 `/api/tools` 入口。
 
 ## 会话接入
@@ -27,9 +27,9 @@
 
 ## 能力管理
 
-- [ ] 从 `src/skill_bridge/` 提取可复用的 Skill 领域逻辑。
-- [ ] 定义统一能力清单与审计模型。
-- [ ] 区分能力来源、能力安装、共享安装和原生加载状态。
+- [x] 从 `src/skill_bridge/` 提取可复用的 Skill 领域逻辑。
+- [x] 定义统一能力清单与审计模型。
+- [x] 在公共模型中区分能力来源、能力安装、共享安装和原生加载状态。
 - [ ] 实现普通安装卸载、全局来源删除、恢复备份和永久清除四种操作边界。
 - [ ] 为来源删除增加依赖影响分析、独立确认和完整预检。
 - [ ] 在 AgentHub UI 中实现 Skill 管理。

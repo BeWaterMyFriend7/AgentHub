@@ -39,3 +39,12 @@
 - 允许根目录只用于限定边界，不能作为递归删除目标；磁盘根目录、用户主目录和 Agent 能力根目录本身始终禁止递归删除。
 - 秘密不进入操作计划、日志、数据库或诊断输出。
 - 并发操作按来源和目标安装加锁，重复请求保持幂等。
+
+## 当前实现
+
+- `src/agent_hub/operations/models.py`：操作请求、计划、预检问题、步骤、确认、恢复等级、结果和审计模型。
+- `src/agent_hub/operations/manager.py`：通过 `plan/execute/rollback` Interface 统一共享安装的路径预检、真实目录备份、链接创建或移除、执行后验证和逆序恢复。
+- `src/agent_hub/operations/audit.py`：当前内存审计实现，后续可替换为持久化 Adapter。
+- `src/agent_hub/platform/links.py`：Windows Junction 与 macOS/Linux Symbolic Link Adapter。
+
+当前执行范围仅包括启用和停用共享安装。普通卸载、来源删除、永久清除、插件更新、原生 Agent 配置变更、并发锁与持久化审计尚未开放，不能通过当前 Interface 绕过。

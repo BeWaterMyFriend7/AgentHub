@@ -1,6 +1,6 @@
 # SkillBridge 参考实现
 
-> 本代码保留在 `src/skill_bridge/`，作为 AgentHub 能力管理的参考实现，目前尚未接入 AgentHub 主运行进程。当前需求见 `docs/modules/capabilities/requirements.md`，早期 SkillBridge 文档归档于 `docs/modules/capabilities/references/skill-management-v1.0.md`，操作手册见 `docs/guides/skill-bridge-operations.md`。
+> 本代码保留在 `src/skill_bridge/`，仅作为历史参考实现，不再继续演进或接入 AgentHub 主运行进程。Skill 扫描与聚合已迁移到 `src/agent_hub/capabilities/`，共享、预检、备份与回滚已迁移到 `src/agent_hub/operations/`，跨平台目录链接位于 `src/agent_hub/platform/`。当前需求见 `docs/modules/capabilities/requirements.md`。
 
 本地 Agent Skill 共享管理器。在同一个机器上管理多个 AI 编码 Agent（如 Codex、OpenCode、Claude Code）的 Skill 目录，通过 NTFS Junction 实现"一份 Skill，多 Agent 使用"，避免重复安装和版本漂移。
 
