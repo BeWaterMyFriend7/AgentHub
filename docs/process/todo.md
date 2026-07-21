@@ -2,10 +2,18 @@
 
 ## 基础建设
 
-- [ ] 引入测试运行器，为当前会话模型建立基线测试。
+- [x] 使用标准库 `unittest` 与 FastAPI `TestClient` 为 Agent Registry、会话聚合、API 响应和迁移兼容层建立基线测试。
 - [ ] 使用持久化的 Agent Adapter 配置替换纯 Mock 配置。
 - [ ] 将 SkillBridge 的成熟领域逻辑合并为 AgentHub 内部 Skill 模块。
 - [ ] 建立 Windows、macOS、Linux 平台文件链接适配接口。
+
+## 模块拆分实施
+
+- [x] 第一阶段：拆出 `agents` 与 `sessions`，建立 `AgentRegistry`、`SessionHub` 和应用组合入口。
+- [x] 第一阶段：保留旧 Python 导入路径和 `/api/tools` 兼容入口，前端切换到 `/api/agents`。
+- [ ] 第二阶段：从 SkillBridge 提取只读发现、解析和状态聚合，建立 `capabilities` 代码模块。
+- [ ] 第三阶段：提取预检、目录链接、备份、回滚和审计，建立 `operations` 代码模块。
+- [ ] 第四阶段：真实 Adapter 与新模块稳定后，删除第一阶段兼容层和旧 `/api/tools` 入口。
 
 ## 会话接入
 

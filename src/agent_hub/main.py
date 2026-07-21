@@ -10,79 +10,81 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from agent_hub.adapters import MockAgentAdapter
-from agent_hub.repository import Repository
-from agent_hub.seed import sessions as seed_sessions
-from agent_hub.seed import tools as seed_tools
-from agent_hub.service import SessionHubService
+from agent_hub.bootstrap import AgentHubRuntime, create_demo_runtime
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-tool_list = seed_tools()
-session_map = seed_sessions()
-repository = Repository(tool_list)
-adapters = {
-    tool.id: MockAgentAdapter(tool, session_map.get(tool.id, []))
-    for tool in tool_list
-}
-service = SessionHubService(repository, adapters)
 
-app = FastAPI(title="Agent Session Hub MVP", version="0.1.0")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
+    active_runtime = runtime or create_demo_runtime()
+    application = FastAPI(title="Agent Session Hub MVP", version="0.1.0")
+    application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @application.get("/")
+    async def index() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @application.get("/api/summary")
+    async def get_summary():
+        return await active_runtime.sessions.summary()
+
+    @application.get("/api/sessions")
+    async def get_sessions():
+        return await active_runtime.sessions.list_sessions()
+
+    @application.get("/api/attention")
+    async def get_attention():
+        return await active_runtime.sessions.attention_sessions()
+
+    @application.get("/api/agents")
+    async def get_agents():
+        return active_runtime.agents.list_profiles()
+
+    @application.get("/api/tools")
+    async def get_tools():
+        """旧前端兼容入口；新代码使用 /api/agents。"""
+        return active_runtime.agents.list_profiles()
+
+    @application.get("/api/events")
+    async def get_events():
+        return active_runtime.events.records
+
+    @application.post("/api/agents/{agent_id}/probe")
+    async def probe_agent(agent_id: str):
+        return await active_runtime.sessions.probe_agent(agent_id)
+
+    @application.post("/api/tools/{tool_id}/probe")
+    async def probe_tool(tool_id: str):
+        """旧前端兼容入口；新代码使用 /api/agents/{agent_id}/probe。"""
+        result = await active_runtime.sessions.probe_agent(tool_id)
+        payload = result.model_dump()
+        payload["tool_id"] = payload.pop("agent_id")
+        return payload
+
+    @application.post("/api/sessions/{session_id}/open")
+    async def open_session(session_id: str):
+        result = await active_runtime.sessions.open_session(session_id)
+        if not result.ok and result.action == "none":
+            raise HTTPException(status_code=404, detail=result.message)
+        return result
+
+    @application.post("/api/demo/tick")
+    async def demo_tick():
+        if active_runtime.demo is None:
+            raise HTTPException(status_code=404, detail="当前运行时未启用 Demo 控制器。")
+        changes = await active_runtime.demo.tick()
+        return {
+            "ok": True,
+            "changes": changes,
+            "message": f"模拟探测完成，产生 {len(changes)} 条状态变化。",
+        }
+
+    return application
 
 
-@app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
-
-
-@app.get("/api/summary")
-async def get_summary():
-    return await service.summary()
-
-
-@app.get("/api/sessions")
-async def get_sessions():
-    return await service.list_sessions()
-
-
-@app.get("/api/attention")
-async def get_attention():
-    return await service.attention_sessions()
-
-
-@app.get("/api/tools")
-async def get_tools():
-    return service.list_tools()
-
-
-@app.get("/api/events")
-async def get_events():
-    return repository.events
-
-
-@app.post("/api/tools/{tool_id}/probe")
-async def probe_tool(tool_id: str):
-    return await service.probe_tool(tool_id)
-
-
-@app.post("/api/sessions/{session_id}/open")
-async def open_session(session_id: str):
-    result = await service.open_session(session_id)
-    if not result.ok and result.action == "none":
-        raise HTTPException(status_code=404, detail=result.message)
-    return result
-
-
-@app.post("/api/demo/tick")
-async def demo_tick():
-    changes = await service.advance_demo()
-    return {
-        "ok": True,
-        "changes": changes,
-        "message": f"模拟探测完成，产生 {len(changes)} 条状态变化。",
-    }
+runtime = create_demo_runtime()
+app = create_app(runtime)
 
 
 def open_browser() -> None:

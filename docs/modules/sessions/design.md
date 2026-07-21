@@ -32,3 +32,12 @@
 恢复入口按 Agent 官方 API、CLI Resume、原生插件或深度链接、原终端/桌面窗口的顺序降级。只有目标明确绑定原生会话 ID 时才算精确恢复；仅激活窗口标记为有限接入。
 
 进程和窗口探测只用于确认 Agent 是否启动、辅助诊断异常退出，或在原生恢复失败时激活窗口，不能单独判断会话完成或待处理状态。
+
+## 当前实现
+
+- `src/agent_hub/sessions/models.py`：会话、状态、规划、事件与统计模型。
+- `src/agent_hub/sessions/hub.py`：会话聚合、统计、待处理和精确恢复 Interface。
+- `src/agent_hub/sessions/adapters/`：会话发现、接入探测与精确恢复 seam。
+- `src/agent_hub/sessions/events.py`：当前内存事件记录实现。
+- `src/agent_hub/demo/seed.py`：仅供 Mock 演示使用的数据，不属于生产事实来源。
+- `src/agent_hub/demo/controller.py`：编排 Mock 状态推进；该能力不进入通用 Session Adapter 契约。

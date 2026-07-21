@@ -1,26 +1,13 @@
-from __future__ import annotations
+"""兼容旧导入路径。"""
 
-from abc import ABC, abstractmethod
+from agent_hub.agents.models import AgentProfile
+from agent_hub.sessions.adapters.base import SessionAdapter
 
-from agent_hub.models import AgentSession, OpenSessionResult, ProbeResult, ToolInfo
 
+class AgentAdapter(SessionAdapter):
+    @property
+    def tool(self) -> AgentProfile:
+        """旧调用方的兼容名称；新代码统一使用 profile。"""
+        return self.profile
 
-class AgentAdapter(ABC):
-    def __init__(self, tool: ToolInfo) -> None:
-        self.tool = tool
-
-    @abstractmethod
-    async def list_sessions(self) -> list[AgentSession]:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def probe(self) -> ProbeResult:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def open_session(self, session_id: str) -> OpenSessionResult:
-        raise NotImplementedError
-
-    async def advance_demo_state(self) -> list[str]:
-        """Demo-only hook. Real adapters should update from API/hooks/events."""
-        return []
+__all__ = ["AgentAdapter"]

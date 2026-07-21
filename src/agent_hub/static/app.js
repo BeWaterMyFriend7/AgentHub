@@ -12,7 +12,7 @@ const statusText = {
 };
 
 let sessions = [];
-let tools = [];
+let agents = [];
 
 async function api(url, options = {}) {
   const response = await fetch(url, {
@@ -82,7 +82,7 @@ function attentionCard(session) {
   return `
     <article class="attention-card">
       <div>
-        <h3>${escapeHtml(session.tool_name)} · ${escapeHtml(session.title)}</h3>
+        <h3>${escapeHtml(session.agent_name)} · ${escapeHtml(session.title)}</h3>
         <p>${escapeHtml(session.status_reason)}</p>
         <div class="attention-meta">
           <span class="badge ${session.status}">${statusText[session.status]}</span>
@@ -113,11 +113,11 @@ function sessionCard(session) {
   const percent = planPercent(session);
   return `
     <article class="session-card">
-      <div class="logo">${initials(session.tool_name)}</div>
+      <div class="logo">${initials(session.agent_name)}</div>
 
       <div>
         <div class="session-title">
-          <h3>${escapeHtml(session.tool_name)} · ${escapeHtml(session.title)}</h3>
+          <h3>${escapeHtml(session.agent_name)} · ${escapeHtml(session.title)}</h3>
           <span class="badge ${session.status}">${statusText[session.status]}</span>
         </div>
         <div class="goal">${escapeHtml(session.current_goal)}</div>
@@ -153,7 +153,7 @@ function renderSessions() {
 
   const filtered = sessions.filter(session => {
     const haystack = [
-      session.tool_name,
+      session.agent_name,
       session.title,
       session.project_name,
       session.current_goal,
@@ -178,20 +178,20 @@ function capabilityRow(label, supported) {
   `;
 }
 
-function toolCard(tool) {
-  const c = tool.capabilities;
+function agentCard(agent) {
+  const c = agent.capabilities;
   return `
     <article class="tool-card">
       <div class="tool-title">
-        <h2>${escapeHtml(tool.name)}</h2>
-        <span class="badge ${tool.connected ? "executing" : "interrupted"}">
-          ${tool.connected ? "已连接" : "未连接"}
+        <h2>${escapeHtml(agent.name)}</h2>
+        <span class="badge ${agent.connected ? "executing" : "interrupted"}">
+          ${agent.connected ? "已连接" : "未连接"}
         </span>
       </div>
       <p>
-        ${escapeHtml(tool.adapter_type)}<br>
-        状态来源：${escapeHtml(tool.status_source)}<br>
-        连接：${escapeHtml(tool.endpoint)}
+        ${escapeHtml(agent.adapter_type)}<br>
+        状态来源：${escapeHtml(agent.status_source)}<br>
+        连接：${escapeHtml(agent.endpoint)}
       </p>
       <div class="capabilities">
         ${capabilityRow("内部会话发现", c.session_discovery)}
@@ -200,32 +200,32 @@ function toolCard(tool) {
         ${capabilityRow("精确恢复会话", c.exact_resume)}
         ${capabilityRow("事件流", c.event_stream)}
       </div>
-      <button class="button small primary" data-probe-tool="${tool.id}">
+      <button class="button small primary" data-probe-agent="${agent.id}">
         探测接入能力
       </button>
     </article>
   `;
 }
 
-function renderTools() {
-  $("#toolGrid").innerHTML = tools.map(toolCard).join("");
+function renderAgents() {
+  $("#toolGrid").innerHTML = agents.map(agentCard).join("");
 }
 
 async function loadData(showToast = false) {
   try {
-    const [summary, allSessions, attention, toolList] = await Promise.all([
+    const [summary, allSessions, attention, agentList] = await Promise.all([
       api("/api/summary"),
       api("/api/sessions"),
       api("/api/attention"),
-      api("/api/tools"),
+      api("/api/agents"),
     ]);
 
     sessions = allSessions;
-    tools = toolList;
+    agents = agentList;
     renderStats(summary);
     renderAttention(attention);
     renderSessions();
-    renderTools();
+    renderAgents();
 
     if (showToast) toast("会话状态已刷新");
   } catch (error) {
@@ -252,9 +252,9 @@ async function openSession(sessionId) {
   }
 }
 
-async function probeTool(toolId) {
+async function probeAgent(agentId) {
   try {
-    const result = await api(`/api/tools/${encodeURIComponent(toolId)}/probe`, {
+    const result = await api(`/api/agents/${encodeURIComponent(agentId)}/probe`, {
       method: "POST",
     });
     const rows = [
@@ -301,8 +301,8 @@ document.addEventListener("click", event => {
   const open = event.target.closest("[data-open-session]");
   if (open) openSession(open.dataset.openSession);
 
-  const probe = event.target.closest("[data-probe-tool]");
-  if (probe) probeTool(probe.dataset.probeTool);
+  const probe = event.target.closest("[data-probe-agent]");
+  if (probe) probeAgent(probe.dataset.probeAgent);
 });
 
 $("#searchInput").addEventListener("input", renderSessions);

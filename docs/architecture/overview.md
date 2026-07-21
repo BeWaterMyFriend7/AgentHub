@@ -4,13 +4,20 @@
 
 ```text
 浏览器 UI
-  -> FastAPI 路由（src/agent_hub/main.py）
-  -> 会话应用服务
-  -> 统一模型与 Repository
-  -> Mock Agent Adapter
+  -> FastAPI 应用工厂（src/agent_hub/main.py）
+  -> 运行时组合（src/agent_hub/bootstrap.py）
+       ├── agents/AgentRegistry
+       ├── sessions/SessionHub
+            ├── sessions/adapters/MockSessionAdapter
+            └── sessions/SessionEventLog
+       └── demo/DemoSessionController（仅演示状态推进）
 ```
 
-当前接近生产结构的代码只实现了基于 Mock Adapter 的会话聚合。`src/skill_bridge/` 是待合并的 Skill 参考子系统；最终只运行一个 AgentHub 应用。
+当前接近生产结构的代码只实现了基于 Mock Adapter 的 Agent 接入和会话聚合。旧的 `models.py`、`service.py`、`repository.py`、`seed.py` 和 `adapters/` 暂时作为第一阶段迁移兼容层；新代码应直接使用 `agents/`、`sessions/` 和 `bootstrap.py`。
+
+核心模型和新 API 统一使用 `agent_id`、`agent_name`；`tool_id` 等旧术语只保留在旧 Python 访问别名和 `/api/tools` 兼容边界中。Demo 状态推进由 `demo` 控制器编排，不属于生产 Session Adapter 契约。
+
+`src/skill_bridge/` 仍是待合并的 Skill 参考子系统；Capabilities 和 Operations 的代码模块将在提取真实逻辑时建立，不提前创建空壳。最终只运行一个 AgentHub 应用。
 
 ## 目标模块化单体
 

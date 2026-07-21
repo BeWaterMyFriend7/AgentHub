@@ -29,3 +29,11 @@ Agents 是接入层的领域入口，维护 Agent 身份、安装、Profile 和 
 ## 持久化
 
 数据库保存 Profile、用户选择、能力声明缓存和验证记录；Agent 安装、原生 API、配置文件和文件系统仍是事实来源。每次连接验证应刷新缓存并保留失败原因。
+
+## 当前实现
+
+- `src/agent_hub/agents/models.py`：Agent Profile 与会话接入能力声明。
+- `src/agent_hub/agents/registry.py`：Agent Profile 的统一读取 Interface。
+- `src/agent_hub/bootstrap.py`：在应用组合入口创建 Registry，不在业务模块内部创建依赖。
+
+当前 Adapter 只覆盖会话发现和恢复，因此作为 Session Adapter 放在 `sessions` 模块，避免 `agents` 反向依赖会话模型。未来出现跨会话、能力等多个真实 Adapter 实现后，再从已验证的共同点提取更高层 Agent Adapter。

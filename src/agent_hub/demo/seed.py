@@ -1,0 +1,245 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+from uuid import uuid4
+
+from agent_hub.agents.models import (
+    AgentProfile,
+    SessionIntegrationCapabilities,
+)
+from agent_hub.sessions.models import (
+    AgentSession,
+    PlanItem,
+    SessionEvent,
+    SessionStatus,
+)
+
+
+def dt(minutes_ago: int) -> datetime:
+    return datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+
+
+def profiles() -> list[AgentProfile]:
+    return [
+        AgentProfile(
+            id="codex",
+            name="Codex",
+            adapter_type="Mock App Server Adapter",
+            enabled=True,
+            connected=True,
+            endpoint="demo://codex-app-server",
+            capabilities=SessionIntegrationCapabilities(
+                session_discovery=True,
+                status_detection=True,
+                plan_reading=True,
+                exact_resume=True,
+                event_stream=True,
+            ),
+            status_source="Mock App Server + Hooks",
+        ),
+        AgentProfile(
+            id="claude-code",
+            name="Claude Code",
+            adapter_type="Mock Hooks Adapter",
+            enabled=True,
+            connected=True,
+            endpoint="demo://claude-hooks",
+            capabilities=SessionIntegrationCapabilities(
+                session_discovery=True,
+                status_detection=True,
+                plan_reading=True,
+                exact_resume=True,
+                event_stream=True,
+            ),
+            status_source="Mock Hooks + Session ID",
+        ),
+        AgentProfile(
+            id="opencode",
+            name="OpenCode",
+            adapter_type="Mock Server API Adapter",
+            enabled=True,
+            connected=True,
+            endpoint="demo://opencode-server",
+            capabilities=SessionIntegrationCapabilities(
+                session_discovery=True,
+                status_detection=True,
+                plan_reading=True,
+                exact_resume=True,
+                event_stream=True,
+            ),
+            status_source="Mock Server API",
+        ),
+    ]
+
+
+def sessions() -> dict[str, list[AgentSession]]:
+    return {
+        "codex": [
+            AgentSession(
+                id="codex-kafka",
+                native_session_id="thread_demo_kafka",
+                agent_id="codex",
+                agent_name="Codex",
+                title="Kafka 多 Topic 疲劳压测",
+                project_name="kafka-pressure-test",
+                working_directory=r"D:\Projects\kafka-pressure-test",
+                status=SessionStatus.WAITING_PERMISSION,
+                status_reason="等待授权执行长时间压力测试命令。",
+                current_goal="完成 15 个 Topic 的均匀与间歇疲劳测试",
+                current_step="执行 15 Topic 持续发送测试",
+                plan_items=[
+                    PlanItem(id="1", title="确认压测参数", status="done"),
+                    PlanItem(id="2", title="完成多 Topic 消息生成", status="done"),
+                    PlanItem(id="3", title="执行梯度测试", status="done"),
+                    PlanItem(id="4", title="执行持续疲劳测试", status="current"),
+                    PlanItem(id="5", title="执行间歇疲劳测试", status="pending"),
+                    PlanItem(id="6", title="汇总测试结果", status="pending"),
+                ],
+                last_activity="准备执行 pressure-runner.ps1，需要用户授权。",
+                updated_at=dt(2),
+                status_source="PermissionRequest Hook",
+                confidence="high",
+            ),
+            AgentSession(
+                id="codex-agent-hub",
+                native_session_id="thread_demo_agent_hub",
+                agent_id="codex",
+                agent_name="Codex",
+                title="Agent Hub MVP 实现",
+                project_name="agent-session-hub",
+                working_directory=r"D:\Projects\agent-session-hub",
+                status=SessionStatus.EXECUTING,
+                status_reason="正在生成后端聚合接口和前端页面。",
+                current_goal="实现内部会话聚合管理台 MVP",
+                current_step="完成会话列表和待处理汇总",
+                plan_items=[
+                    PlanItem(id="1", title="建立统一会话模型", status="done"),
+                    PlanItem(id="2", title="实现适配器接口", status="done"),
+                    PlanItem(id="3", title="实现聚合 API", status="current"),
+                    PlanItem(id="4", title="实现 Web 页面", status="pending"),
+                    PlanItem(id="5", title="完成 Demo 验证", status="pending"),
+                ],
+                last_activity="正在实现 /api/sessions 聚合接口。",
+                updated_at=dt(1),
+                status_source="Thread event stream",
+                confidence="high",
+            ),
+        ],
+        "claude-code": [
+            AgentSession(
+                id="claude-skill-doc",
+                native_session_id="session_demo_skill_doc",
+                agent_id="claude-code",
+                agent_name="Claude Code",
+                title="Skill 文档结构整理",
+                project_name="skills",
+                working_directory=r"D:\Projects\skills",
+                status=SessionStatus.AWAITING_REVIEW,
+                status_reason="规划和文档调整已完成，等待人工验收。",
+                current_goal="统一多个 Skill 的文档和示例目录",
+                current_step="等待检查输出文档",
+                plan_items=[
+                    PlanItem(id="1", title="梳理现有目录", status="done"),
+                    PlanItem(id="2", title="设计统一结构", status="done"),
+                    PlanItem(id="3", title="调整示例目录", status="done"),
+                    PlanItem(id="4", title="补充 README 索引", status="done"),
+                ],
+                last_activity="已输出新的目录结构和迁移说明。",
+                updated_at=dt(5),
+                status_source="Stop Hook",
+                confidence="high",
+            ),
+            AgentSession(
+                id="claude-nacos-question",
+                native_session_id="session_demo_nacos",
+                agent_id="claude-code",
+                agent_name="Claude Code",
+                title="Nacos 监听方案确认",
+                project_name="sidecar",
+                working_directory=r"D:\Projects\sidecar",
+                status=SessionStatus.WAITING_INPUT,
+                status_reason="Agent 提出实现边界问题，等待用户回答。",
+                current_goal="确定 Nacos 3 实时监听实现方式",
+                current_step="确认是否允许引入独立 SDK 进程",
+                plan_items=[
+                    PlanItem(id="1", title="分析现有轮询方案", status="done"),
+                    PlanItem(id="2", title="对比 SDK 与 sidecar 方案", status="done"),
+                    PlanItem(id="3", title="确认部署约束", status="current"),
+                    PlanItem(id="4", title="输出最终设计", status="pending"),
+                ],
+                last_activity="询问：是否允许增加独立的 Nacos SDK 子进程？",
+                updated_at=dt(3),
+                status_source="Assistant question + Stop Hook",
+                confidence="medium",
+            ),
+        ],
+        "opencode": [
+            AgentSession(
+                id="opencode-license",
+                native_session_id="ses_demo_license",
+                agent_id="opencode",
+                agent_name="OpenCode",
+                title="开源许可证批量核验",
+                project_name="license-research",
+                working_directory=r"D:\Projects\license-research",
+                status=SessionStatus.INTERRUPTED,
+                status_reason="会话执行异常中断，需要恢复后继续。",
+                current_goal="核验 30 个软件版本的许可证及来源",
+                current_step="恢复第 18 个软件的来源核验",
+                plan_items=[
+                    PlanItem(id="1", title="加载软件清单", status="done"),
+                    PlanItem(id="2", title="核验前 15 项", status="done"),
+                    PlanItem(id="3", title="核验第 16-30 项", status="current"),
+                    PlanItem(id="4", title="输出表格", status="pending"),
+                ],
+                last_activity="请求上游页面时连接中断。",
+                updated_at=dt(8),
+                status_source="Server API error event",
+                confidence="high",
+            ),
+            AgentSession(
+                id="opencode-ui",
+                native_session_id="ses_demo_ui",
+                agent_id="opencode",
+                agent_name="OpenCode",
+                title="终端主题优化",
+                project_name="terminal-config",
+                working_directory=r"D:\Projects\terminal-config",
+                status=SessionStatus.CLOSED,
+                status_reason="会话已完成并归档。",
+                current_goal="完成 Windows Terminal 主题配置",
+                current_step="已关闭",
+                plan_items=[
+                    PlanItem(id="1", title="选择主题", status="done"),
+                    PlanItem(id="2", title="生成配置", status="done"),
+                    PlanItem(id="3", title="验证分屏效果", status="done"),
+                ],
+                last_activity="已完成并归档。",
+                updated_at=dt(60),
+                status_source="Session archived event",
+                confidence="high",
+            ),
+        ],
+    }
+
+
+def events() -> list[SessionEvent]:
+    return [
+        SessionEvent(
+            id=str(uuid4()),
+            agent_id="codex",
+            session_id="codex-kafka",
+            title="Codex 等待授权",
+            detail="Kafka 多 Topic 疲劳压测需要授权执行命令。",
+            created_at=datetime.now(timezone.utc),
+        ),
+        SessionEvent(
+            id=str(uuid4()),
+            agent_id="claude-code",
+            session_id="claude-skill-doc",
+            title="Claude Code 等待验收",
+            detail="Skill 文档结构整理已输出结果。",
+            created_at=datetime.now(timezone.utc),
+        ),
+    ]
