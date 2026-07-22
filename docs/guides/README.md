@@ -4,6 +4,10 @@
 
 当前能力管理模块尚未接入统一 AgentHub API/UI，因此暂不提供 Skill、MCP 或插件的用户操作手册。相关功能完成并经过验证后，再按实际入口、支持平台、安全确认和恢复方式补充指南。
 
+当前开发与维护指南：
+
+- [CodeGraph 代码索引使用指南](./codegraph.md)
+
 历史 SkillBridge 的需求与迁移信息见：
 
 - [Skill 管理需求 v1.0](../modules/capabilities/references/skill-management-v1.0.md)

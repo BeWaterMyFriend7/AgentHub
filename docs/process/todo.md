@@ -7,6 +7,7 @@
 - [x] 将 SkillBridge 的 Skill 扫描、聚合、共享、备份与回滚逻辑提取到 AgentHub 模块。
 - [x] 建立 Windows Junction、macOS/Linux Symbolic Link 平台适配 Interface。
 - [x] 完成 SkillBridge 逐文件迁移记录，并从正式源码树移除独立旧应用。
+- [x] 使用 CodeGraph 建立本地源码索引，移除 Graphify 环境和索引产物，并补充维护指南。
 - [ ] 建立统一持久化边界，保存 Agent Profile、稳定能力来源选择和操作审计；扫描缓存不作为事实来源。
 
 ## 模块拆分实施

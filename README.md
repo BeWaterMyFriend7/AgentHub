@@ -6,6 +6,7 @@ AgentHub 是面向 Windows、macOS、Linux 桌面环境的本地 AI Agent 管理
 
 ```text
 AgentHub/
+├── .codegraph/               # CodeGraph 项目标记；本机索引数据库不提交
 ├── agent.md                  # 项目约定与 Agent 协作规则
 ├── src/
 │   └── agent_hub/            # AgentHub 模块化单体实现
@@ -23,6 +24,17 @@ AgentHub/
 ```
 
 修改产品行为或架构前，先阅读[文档索引](./docs/README.md)和[总 PRD](./docs/prd/agenthub-v1.md)。
+
+## 代码索引
+
+本项目统一使用 CodeGraph 理解源码关系，不再维护 Graphify 索引。首次克隆或本机尚无索引时执行：
+
+```powershell
+codegraph init .
+codegraph status .
+```
+
+查询代码优先使用 `codegraph explore "问题"` 或 `codegraph node <符号或文件>`；源码变更后执行 `codegraph sync .`。`.codegraph/.gitignore` 会随仓库提交，实际索引数据库仅保存在本机。详细说明见 [CodeGraph 使用指南](./docs/guides/codegraph.md)。
 
 ## 运行 AgentHub
 

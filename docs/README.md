@@ -10,7 +10,7 @@
 | `architecture/` | 系统当前是什么样、模块怎样协作、为什么这样决策 | [`overview.md`](./architecture/overview.md)、[`design.md`](./architecture/design.md)、[`adr/`](./architecture/adr/) |
 | `modules/` | 某个模块具体做什么、如何实现和怎样验证 | [`agents`](./modules/agents/README.md)、[`sessions`](./modules/sessions/README.md)、[`capabilities`](./modules/capabilities/README.md)、[`operations`](./modules/operations/README.md) |
 | `process/` | 下一步做什么、当前待办、已经学到什么 | `roadmap.md`、`todo.md`、`learnings.md` |
-| `guides/` | 如何操作、开发和维护 | [`README.md`](./guides/README.md)；当前暂无可执行的能力管理手册 |
+| `guides/` | 如何操作、开发和维护 | [`README.md`](./guides/README.md)、[`codegraph.md`](./guides/codegraph.md) |
 | `prototypes/` | 非生产 UI 和技术实验 | `agent-hub-v1.md`、`agent_hub_prototype_v3.html` |
 
 ## 文档职责
