@@ -6,6 +6,8 @@
 - [ ] 使用持久化的 Agent Adapter 配置替换纯 Mock 配置。
 - [x] 将 SkillBridge 的 Skill 扫描、聚合、共享、备份与回滚逻辑提取到 AgentHub 模块。
 - [x] 建立 Windows Junction、macOS/Linux Symbolic Link 平台适配 Interface。
+- [x] 完成 SkillBridge 逐文件迁移记录，并从正式源码树移除独立旧应用。
+- [ ] 建立统一持久化边界，保存 Agent Profile、稳定能力来源选择和操作审计；扫描缓存不作为事实来源。
 
 ## 模块拆分实施
 
@@ -31,8 +33,11 @@
 - [x] 定义统一能力清单与审计模型。
 - [x] 在公共模型中区分能力来源、能力安装、共享安装和原生加载状态。
 - [ ] 实现普通安装卸载、全局来源删除、恢复备份和永久清除四种操作边界。
+- [ ] 将来源迁移实现为正式 Operation，覆盖全量预检、独立确认、逐步审计、失败补偿和重新扫描。
+- [ ] 在应用服务层提供批量能力操作，但每个子操作仍独立预检、审计并返回结果。
 - [ ] 为来源删除增加依赖影响分析、独立确认和完整预检。
 - [ ] 在 AgentHub UI 中实现 Skill 管理。
+- [ ] 在统一桌面应用中提供跨平台能力目录选择；不得恢复 SkillBridge 的 Windows 专用文件浏览接口。
 - [ ] 调研 Codex、OpenCode、Claude Code 的 MCP 配置格式与生命周期。
 - [ ] 定义 MCP 敏感信息安全归一化和健康探测方案。
 - [ ] 调研各 Agent 的原生插件 Manifest、Catalog 和安装操作。

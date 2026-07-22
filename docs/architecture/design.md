@@ -49,4 +49,4 @@ agents / sessions / capabilities / operations
 
 ## 代码组织方向
 
-`src/agent_hub/` 继续作为唯一应用包，后续按四个业务模块组织内部包，并保留共享的 `api`、`storage`、`platform` 等基础设施。SkillBridge 的成熟逻辑按职责迁入 `capabilities` 或 `operations`，不整体嵌入为第二套应用。
+`src/agent_hub/` 继续作为唯一应用包，后续按四个业务模块组织内部包，并保留共享的 `api`、`storage`、`platform` 等基础设施。SkillBridge 的成熟逻辑按职责迁入 `capabilities` 或 `operations`，不整体嵌入为第二套应用；逐文件处理结论见 [SkillBridge 迁移记录](../modules/capabilities/references/skill-bridge-migration.md)。

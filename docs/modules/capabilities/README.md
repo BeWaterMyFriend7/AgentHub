@@ -8,3 +8,4 @@
 - [BDD 场景](./bdd/)
 - [验证记录](./verification/README.md)
 - [历史与研究材料](./references/)
+  - [SkillBridge 逐文件迁移记录](./references/skill-bridge-migration.md)

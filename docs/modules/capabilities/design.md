@@ -36,7 +36,7 @@ Skill、MCP Server 和 Agent 插件是同一公共模型下的三种能力类型
 - MCP Server：归一化传输方式、命令或端点、Tools/Resources/Prompts 和健康状态；敏感值不进入公共模型。
 - Agent 插件：解析原生 Manifest/Catalog、版本、更新和内含能力，并维护所有权关系。
 
-历史 SkillBridge 设计仅作为 [`references/`](./references/) 中的追溯材料。三种类型出现足够多的独立模型和流程后，再考虑拆分专属设计文档。
+历史 SkillBridge 设计仅作为 [`references/`](./references/) 中的追溯材料，旧源码的处理结论见[逐文件迁移记录](./references/skill-bridge-migration.md)。三种类型出现足够多的独立模型和流程后，再考虑拆分专属设计文档。
 
 ## 当前实现
 

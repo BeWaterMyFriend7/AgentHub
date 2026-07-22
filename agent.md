@@ -7,7 +7,6 @@ AgentHub 是跨 Windows、macOS、Linux 的本地 AI Agent 管理中枢。它聚
 ## 仓库导航
 
 - `src/agent_hub/`：当前会话聚合 MVP，未来承载唯一的 AgentHub 应用。
-- `src/skill_bridge/`：Skill 发现、共享、审计、回滚和 Windows Junction 的参考实现。
 - `docs/prd/`：全局产品需求、范围和业务事实来源。
 - `docs/architecture/`：系统现状、系统级设计和需要长期保留的 ADR。
 - `docs/modules/`：Agents、Sessions、Capabilities、Operations 的需求、设计、BDD、测试和验证证据。
@@ -34,4 +33,3 @@ AgentHub 是跨 Windows、macOS、Linux 的本地 AI Agent 管理中枢。它聚
 - Windows：`start.bat`
 - Linux/macOS：`./start.sh`
 - 直接运行：设置 `PYTHONPATH=src`，然后执行 `python -m agent_hub.main`
-- SkillBridge 参考实现：进入 `src/skill_bridge` 后执行 `python main.py`

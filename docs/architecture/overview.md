@@ -17,7 +17,7 @@
 
 核心模型和新 API 统一使用 `agent_id`、`agent_name`；`tool_id` 等旧术语只保留在旧 Python 访问别名和 `/api/tools` 兼容边界中。Demo 状态推进由 `demo` 控制器编排，不属于生产 Session Adapter 契约。
 
-`src/skill_bridge/` 已完成本轮领域逻辑提取，仅作为历史参考保留。Capabilities 与 Operations 暂未接入 HTTP API/UI，也尚未实现 MCP、插件、来源删除和持久化审计；这些功能继续在同一个 AgentHub 应用内迭代，不恢复独立 SkillBridge 应用。
+历史 SkillBridge 已完成本轮领域逻辑提取，其独立应用源码已从 `src/` 移除，迁移结论记录在 [`../modules/capabilities/references/skill-bridge-migration.md`](../modules/capabilities/references/skill-bridge-migration.md)。Capabilities 与 Operations 暂未接入 HTTP API/UI，也尚未实现 MCP、插件、来源删除和持久化审计；这些功能继续在同一个 AgentHub 应用内迭代，不恢复独立 SkillBridge 应用。
 
 ## 目标模块化单体
 
