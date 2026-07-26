@@ -11,9 +11,9 @@ AgentHub/
 ├── src/
 │   └── agent_hub/            # AgentHub 模块化单体实现
 ├── docs/
-│   ├── prd/                  # 全局产品需求与范围
-│   ├── architecture/         # 系统架构、系统级设计与 ADR
-│   ├── modules/              # 各模块的需求、设计、BDD、测试与验证
+│   ├── README.md             # 产品范围与文档索引
+│   ├── architecture/         # 统一系统架构与 ADR
+│   ├── modules/              # 各模块的需求、设计、测试与验证
 │   ├── process/              # 路线图、待办和经验
 │   ├── guides/               # 操作与开发指南
 │   └── prototypes/           # 非生产原型
@@ -23,7 +23,7 @@ AgentHub/
 └── start.sh
 ```
 
-修改产品行为或架构前，先阅读[文档索引](./docs/README.md)和[总 PRD](./docs/prd/agenthub-v1.md)。
+修改产品行为或架构前，先阅读[文档索引](./docs/README.md)、[系统架构](./docs/architecture/architecture.md)和对应模块的 `requirements.md`。
 
 ## 代码索引
 

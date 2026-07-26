@@ -1,6 +1,6 @@
 # SkillBridge 迁移记录
 
-> 状态：历史实现迁移记录，不是当前需求或设计事实来源。当前产品范围以[总 PRD](../../../prd/agenthub-v1.md)为准，模块边界以 [Capabilities 需求](../requirements.md)和 [Operations 需求](../../operations/requirements.md)为准。
+> 状态：历史实现迁移记录，不是当前需求或设计事实来源。当前产品范围以 [`docs/README.md`](../../../README.md) 为准，模块边界以 [Capabilities 需求](../requirements.md)和 [Operations 需求](../../operations/requirements.md)为准。
 
 ## 结论
 
@@ -79,4 +79,4 @@ SkillBridge 不再作为独立应用运行，也不在 `src/` 中保留第二套
 
 - 领域逻辑提取提交：`589b83e refactor: 提取 capabilities 与 operations 模块`
 - 历史需求来源：[Skill 管理需求 v1.0](./skill-management-v1.0.md)
-- 当前实现验证：[Capabilities 模块拆分验证](../verification/2026-07-22-capabilities-module-split.md)与 [Operations 模块拆分验证](../../operations/verification/2026-07-22-operations-module-split.md)
+- 实现历史与验证：[Capabilities 模块拆分记录](./2026-07-22-capabilities-module-split.md)与 [Windows 文件系统操作验证](../../operations/verification/2026-07-22-windows-filesystem-operations.md)

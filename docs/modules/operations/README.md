@@ -6,4 +6,4 @@
 - [设计](./design.md)
 - [测试策略](./testing.md)
 - [BDD 场景](./bdd/)
-- [验证记录](./verification/README.md)
+- [真实验证记录](./verification/README.md)

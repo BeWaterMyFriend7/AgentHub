@@ -6,6 +6,8 @@
 - [设计](./design.md)
 - [测试策略](./testing.md)
 - [BDD 场景](./bdd/)
-- [验证记录](./verification/README.md)
 - [历史与研究材料](./references/)
   - [SkillBridge 逐文件迁移记录](./references/skill-bridge-migration.md)
+  - [Capabilities 模块拆分记录](./references/2026-07-22-capabilities-module-split.md)
+
+真实 Agent 验证证据产生后再创建 `verification/`。

@@ -4,4 +4,4 @@
 
 不得使用真实用户能力目录作为首次验证目标。任何不可逆验证都应单独说明授权和恢复边界。
 
-- [2026-07-22：Operations 模块拆分验证](./2026-07-22-operations-module-split.md)
+- [2026-07-22：Windows 文件系统与目录链接操作验证](./2026-07-22-windows-filesystem-operations.md)

@@ -1,4 +1,6 @@
-# Agents / Sessions 第一阶段模块拆分验证
+# Agents / Sessions 第一阶段模块拆分历史记录
+
+> 状态：Mock Adapter 与自动化测试记录，不是当前需求事实，也不能作为真实 Agent 接入验证证据。
 
 ## 范围
 

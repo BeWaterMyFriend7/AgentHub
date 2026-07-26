@@ -1,6 +1,6 @@
 # Agents 模块需求
 
-> 本文从[总 PRD](../../prd/agenthub-v1.md)派生；发生冲突时以总 PRD 为准。
+本文是 Agents 模块需求事实来源。
 
 ## 目标
 
@@ -19,7 +19,7 @@
 - Agent 类型、Agent 安装和 AgentHub Profile 是不同对象，不得仅用显示名称合并。
 - 停用 Profile 只停止 AgentHub 发现和操作，不删除 Agent 文件、配置或能力。
 - 每项能力必须明确声明“支持、不支持或尚未验证”，不能仅因代码路径存在就标记为支持。
-- 会话接入等级与 Skill、MCP、插件支持状态分别展示，不能互相推导。
+- 会话观察、任务执行与 Skill、MCP、插件支持状态分别展示，不能互相推导。
 - Adapter 的平台或版本限制必须对用户可见。
 - 一个 Agent 接入只有通过对应真实验证，才能从实验性提升为完整支持。
 
@@ -27,5 +27,5 @@
 
 - 至少能够配置并区分同一 Agent 产品的多个安装或 Profile。
 - Profile 校验失败时展示可操作的原因，不影响其他 Profile。
-- 会话和能力模块通过稳定 Agent ID 使用配置，不直接读取 UI 表单状态。
+- Sessions、Workflows 和 Capabilities 通过稳定 Agent ID 使用配置，不直接读取 UI 表单状态。
 - Windows、macOS、Linux 上的路径和可执行文件探测结果可明确区分“未安装”“无权限”和“尚未验证”。

@@ -1,6 +1,6 @@
 # SkillBridge
 
-> **状态：历史需求来源，非当前有效 PRD。** 本文保留 SkillBridge 早期的需求与实现设想，用于追溯 Skill 子系统；当前产品范围以[总 PRD](../../../prd/agenthub-v1.md)为准，当前模块口径以[Capabilities 模块需求](../requirements.md)为准。有效设计与测试结论分别进入本模块的 `design.md` 和 `testing.md`。
+> **状态：历史需求来源，不是当前需求事实。** 本文保留 SkillBridge 早期的需求与实现设想，用于追溯 Skill 子系统；当前产品范围以 [`docs/README.md`](../../../README.md) 为准，当前模块口径以[Capabilities 模块需求](../requirements.md)为准。有效设计与测试结论分别进入本模块的 `design.md` 和 `testing.md`。
 
 ## 本地 Agent Skill 共享管理器
 
