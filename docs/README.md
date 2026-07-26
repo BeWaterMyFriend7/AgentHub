@@ -15,6 +15,12 @@ AgentHub 是面向 Windows、macOS、Linux 的本地 AI Agent 管理中枢。它
 
 当前不包含云端同步、团队权限和组织策略分发。每项业务需求由所属模块的 `requirements.md` 维护；跨模块结构和公共约束由系统架构维护，难以逆转的决策记录为 ADR。
 
+## 产品边界变化
+
+早期会话 MVP 只观察状态并精确打开原生会话，不在 AgentHub 内发送消息，也不提供人工会话标记。当前规划将任务排队作为 Workflows 的受控能力，将人工跟进标记作为 Sessions 的本地元数据能力；具体业务规则分别由 [Workflows 需求](./modules/workflows/requirements.md)和 [Sessions 需求](./modules/sessions/requirements.md)维护。
+
+任务发送、会话观察和项目上下文的模块归属见 [ADR-0009](./architecture/adr/0009-workflows-and-session-follow-up-boundary.md)。
+
 ## 文档结构
 
 | 目录 | 回答的问题 | 主要入口 |

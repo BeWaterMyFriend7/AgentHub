@@ -38,7 +38,10 @@
 
 ## 产品边界
 
+- 自动发送排队任务只通过 Workflows Interface 发起；跨模块归属见 [ADR-0009](../../architecture/adr/0009-workflows-and-session-follow-up-boundary.md)。
+- 本能力是对早期“AgentHub 不发送会话消息”边界的受控扩展，只允许发送用户预先确认并进入队列的任务。
 - Workflows 只发送用户预先确认的任务内容，不自动生成新的业务任务。
+- Workflows 不提供脱离任务队列的任意即时聊天，也不提供权限批准入口。
 - 自动执行能力按 Agent/Profile 独立声明；只支持会话观察和打开的 Agent 不得显示为支持任务编排。
 - Workflows 不解释 Agent 原生会话格式，由执行 Adapter 和 Sessions 模块提供稳定 Interface。
 
