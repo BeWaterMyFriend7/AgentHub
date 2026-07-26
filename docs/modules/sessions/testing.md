@@ -31,3 +31,25 @@
 
 - [`session-observation.feature`](./bdd/session-observation.feature)：会话发现、统计、规划和精确恢复。
 - [`session-attention.feature`](./bdd/session-attention.feature)：待处理识别、自动解除和状态可信度。
+
+## OpenCode 契约与真实验证
+
+- 使用 `httpx.MockTransport` 验证多会话解析、稳定身份、状态映射、Todo、最近活动和认证脱敏。
+- 公共契约测试验证重复扫描不改变会话身份，精确恢复目标始终包含原生会话 ID。
+- 真实验证脚本为 `scripts/verify_opencode_sessions.py`，密码只通过 `OPENCODE_SERVER_PASSWORD` 环境变量提供。
+- 真实验证至少运行两次扫描，启动一个指定原生会话的恢复进程，并由人工确认 TUI 内容；历史会话状态缺失时必须显示 `unknown`。
+
+## Codex 契约与真实验证
+
+- 使用临时 SQLite 和 rollout JSONL 验证 `task_started`、`request_user_input`、`task_complete`、`turn_aborted` 与统一状态的映射。
+- 验证 `request_user_input` 收到对应调用结果后恢复为 `executing`，缺失 rollout 时降级为 `unknown`。
+- 公共契约测试验证重复扫描保持稳定 Thread ID，精确定位目标始终包含原生 Thread ID。
+- 真实验证脚本为 `scripts/verify_codex_sessions.py`，默认读取 `CODEX_HOME` 或 `~/.codex`，不需要认证信息。
+- 真实验证至少运行两次扫描，同时检测一个运行中任务和一个带 `task_complete` 证据的历史任务；可用 `--open-session <thread-id>` 验证 Desktop 深链定位。
+
+## OpenCode Desktop 契约与真实验证
+
+- `test_opencode_desktop_adapter.py` 使用临时 SQLite 验证执行中、中断、已归档和未知状态，验证 Todo、最近活动、稳定 ID 与 CLI Resume 原生 ID。
+- 真实环境直接读取本机约 2.68 GB 的 OpenCode Desktop 数据库，不使用 Desktop Server 密码。
+- 真实环境连续扫描两次，Codex Desktop 与 OpenCode Desktop 共返回 200 个会话，200 个内部 ID 全部稳定。
+- 浏览器验收确认 Dashboard 单次扫描、两个 Profile 连接状态、动态 Profile 表单和 OpenCode Desktop 探测结果正确。

@@ -28,7 +28,7 @@ ATTENTION_STATUSES = {
 class PlanItem(BaseModel):
     id: str
     title: str
-    status: Literal["done", "current", "pending"]
+    status: Literal["done", "current", "pending", "cancelled"]
 
 
 class AgentSession(BaseModel):

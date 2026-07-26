@@ -48,3 +48,42 @@ Sessions 提供稳定会话身份、归一化事件和精确恢复 Interface。W
 - `src/agent_hub/sessions/events.py`：当前内存事件记录实现。
 - `src/agent_hub/demo/seed.py`：仅供 Mock 演示使用的数据，不属于生产事实来源。
 - `src/agent_hub/demo/controller.py`：编排 Mock 状态推进；该能力不进入通用 Session Adapter 契约。
+
+## OpenCode 映射
+
+`OpenCodeSessionAdapter` 使用官方 Server API，并以 `Agent Profile ID + 原生会话 ID` 生成稳定内部身份。工作目录来自 OpenCode `location.directory`，项目名只取该目录名称；Todo 和最近消息文本均读取原生响应，不生成推测步骤。
+
+- `running` 或 `busy` 映射为 `executing`。
+- `retry` 保留原生重试消息并映射为 `executing`。
+- `idle` 映射为 `unknown`，原因中保留原生 idle，不推断为等待输入或已完成。
+- 不在活动结果中的历史会话标记为 `unknown`，原因中保留 inactive，不推断为已关闭。
+
+精确恢复使用 `opencode attach <endpoint> --session <native_session_id> --dir <directory>`。认证通过进程环境变量传入，不出现在命令行、API 响应或事件记录中。
+
+## Codex 映射
+
+`CodexSessionAdapter` 只读 Codex Desktop 本地状态，不要求 API Key、ChatGPT 登录信息或额外 Server。稳定任务元数据来自 `CODEX_HOME` 中版本号最大的 `state_*.sqlite` 的 `threads` 表，轮次状态、规划和最近活动来自每个任务的 `rollout-*.jsonl`。
+
+- 最近生命周期事件为 `task_started`，且没有后续完成或中断事件时映射为 `executing`；由于异常退出可能来不及写入终止事件，该状态可信度为中等。
+- 当前轮次存在尚未返回的 `request_user_input` 调用时映射为 `waiting_input`。
+- `task_complete` 映射为 `closed`，只表示当前轮次已结束，任务仍可继续发送后续内容。
+- `turn_aborted` 映射为 `interrupted`。
+- rollout 缺失、损坏或尾部没有完整生命周期证据时映射为 `unknown`，不根据窗口、进程或更新时间推断完成。
+
+规划只读取当前轮次最近一次 `update_plan` 的原生参数。精确定位使用 Codex Desktop 注册的 `codex://threads/<native_thread_id>` 深链；深链包含稳定原生 Thread ID，不依赖窗口标题或最近任务。
+
+当前接入采用周期扫描，不声明 Codex App Server 内存事件流能力。等待授权状态主要存在于 App Server 运行时通知，尚未找到可供 AgentHub 独立进程稳定读取的持久化证据，因此首版不推断 `waiting_permission`。
+
+## OpenCode Desktop 映射
+
+`OpenCodeDesktopSessionAdapter` 不连接 Desktop 内置 HTTP Server，因此不需要读取其每次启动随机生成的认证密码。Adapter 以只读方式打开 `~/.local/share/opencode/opencode.db`，读取顶层 `session`、`message`、`part` 和 `todo`，并使用 `Agent Profile ID + 原生会话 ID` 生成稳定内部身份。
+
+- 会话已归档时映射为 `closed`。
+- 最近 assistant 消息没有完成时间时映射为 `executing`。
+- 最近响应包含原生 `error` 时映射为 `interrupted`，并保留错误类型。
+- 最近消息来自用户且尚未观察到 assistant 完成事件时映射为 `executing`，可信度为中等。
+- 最近 assistant 响应已结束但会话未归档时映射为 `unknown`，不根据回复文字或 Todo 猜测任务已经完成。
+
+Todo 状态按原生 `completed/in_progress/pending/cancelled` 映射。恢复入口使用共享同一会话数据库的官方命令 `opencode <directory> --session <native_session_id>`；该入口精确携带原生 ID，但当前打开的是 CLI/TUI，不冒充 OpenCode Desktop 深链。
+
+Dashboard API 在一次刷新中只扫描一次所有 Adapter，再同时生成统计、待处理和会话列表。单个 Adapter 读取失败会记录事件并将对应 Profile 标为断开，不影响其他 Profile 的会话返回。

@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 import webbrowser
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -10,15 +11,26 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from agent_hub.bootstrap import AgentHubRuntime, create_demo_runtime
+from agent_hub.agents.models import AgentProfileInput, AgentProfilePatch
+from agent_hub.bootstrap import AgentHubRuntime, create_configured_runtime
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
 
 def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
-    active_runtime = runtime or create_demo_runtime()
-    application = FastAPI(title="Agent Session Hub MVP", version="0.1.0")
+    active_runtime = runtime or create_configured_runtime()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        yield
+        await active_runtime.aclose()
+
+    application = FastAPI(
+        title="Agent Session Hub MVP",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @application.get("/")
@@ -28,6 +40,12 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     @application.get("/api/summary")
     async def get_summary():
         return await active_runtime.sessions.summary()
+
+    @application.get("/api/dashboard")
+    async def get_dashboard():
+        dashboard = await active_runtime.sessions.dashboard()
+        dashboard["agents"] = active_runtime.agents.list_profiles()
+        return dashboard
 
     @application.get("/api/sessions")
     async def get_sessions():
@@ -41,6 +59,36 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     async def get_agents():
         return active_runtime.agents.list_profiles()
 
+    @application.get("/api/agent-types")
+    async def get_agent_types():
+        return active_runtime.adapter_definitions()
+
+    @application.post("/api/agents", status_code=201)
+    async def create_agent(payload: AgentProfileInput):
+        try:
+            return await active_runtime.create_profile(payload)
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @application.put("/api/agents/{agent_id}")
+    async def update_agent(agent_id: str, payload: AgentProfilePatch):
+        try:
+            profile = await active_runtime.update_profile(agent_id, payload)
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        if profile is None:
+            raise HTTPException(status_code=404, detail="没有找到该 Agent Profile。")
+        return profile
+
+    @application.delete("/api/agents/{agent_id}", status_code=204)
+    async def delete_agent(agent_id: str):
+        try:
+            deleted = await active_runtime.delete_profile(agent_id)
+        except RuntimeError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        if not deleted:
+            raise HTTPException(status_code=404, detail="没有找到该 Agent Profile。")
+
     @application.get("/api/tools")
     async def get_tools():
         """旧前端兼容入口；新代码使用 /api/agents。"""
@@ -52,7 +100,7 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
 
     @application.post("/api/agents/{agent_id}/probe")
     async def probe_agent(agent_id: str):
-        return await active_runtime.sessions.probe_agent(agent_id)
+        return await active_runtime.probe_agent(agent_id)
 
     @application.post("/api/tools/{tool_id}/probe")
     async def probe_tool(tool_id: str):
@@ -83,7 +131,7 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     return application
 
 
-runtime = create_demo_runtime()
+runtime = create_configured_runtime()
 app = create_app(runtime)
 
 

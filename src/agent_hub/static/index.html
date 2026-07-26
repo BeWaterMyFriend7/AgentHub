@@ -3,29 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agent Session Hub</title>
+  <title>AgentHub</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2319372e'/%3E%3Ctext x='12' y='42' font-size='25' fill='%23d9e890'%3EAH%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-icon">AH</div>
+        <div class="brand-mark">AH</div>
         <div>
-          <strong>Agent Hub</strong>
-          <span>内部会话聚合 MVP</span>
+          <strong>AgentHub</strong>
+          <span>本地 Agent 控制台</span>
         </div>
       </div>
 
       <nav>
-        <button class="nav active" data-page="overview">⌂ <span>会话总览</span></button>
-          <button class="nav" data-page="tools">◈ <span>Agent 接入</span></button>
+        <button class="nav active" data-page="overview"><span class="nav-index">01</span>会话总览</button>
+        <button class="nav" data-page="agents"><span class="nav-index">02</span>Agent 配置</button>
       </nav>
 
-      <div class="runtime">
-        <b>● Demo 服务正常</b>
-        <span>Mock Adapter</span>
-        <span>刷新间隔：5 秒</span>
+      <div class="runtime" id="runtimeState">
+        <b>本地运行时</b>
+        <span>正在读取真实 Agent 会话</span>
       </div>
     </aside>
 
@@ -33,13 +33,11 @@
       <section id="overview" class="page active">
         <header>
           <div>
-            <h1>AI Agent 会话总览</h1>
-            <p>聚合内部会话、规划状态与待处理事项，而不是简单统计窗口。</p>
+            <p class="eyebrow">SESSION OBSERVATORY</p>
+            <h1>会话总览</h1>
+            <p>跨 Agent 聚合真实内部会话、Todo、状态来源和恢复入口。</p>
           </div>
-          <div class="header-actions">
-            <button class="button" id="refreshBtn">↻ 刷新</button>
-            <button class="button primary" id="tickBtn">▶ 模拟下一轮探测</button>
-          </div>
+          <button class="button primary" id="refreshBtn">刷新状态</button>
         </header>
 
         <div class="stats" id="stats"></div>
@@ -47,8 +45,8 @@
         <section class="panel attention-panel">
           <div class="panel-head">
             <div>
-              <h2>待处理</h2>
-              <p>等待授权、等待输入、等待验收或任务中断的会话。</p>
+              <h2>需要处理</h2>
+              <p>仅展示具有可靠中断、等待或验收依据的会话。</p>
             </div>
             <span class="count-badge" id="attentionCount">0</span>
           </div>
@@ -59,7 +57,7 @@
           <div class="panel-head session-head">
             <div>
               <h2>全部会话</h2>
-              <p>每张卡片代表 Agent 内部真实会话。</p>
+              <p>每条记录都绑定 Profile 与 Agent 原生会话 ID。</p>
             </div>
             <div class="filters">
               <input id="searchInput" placeholder="搜索会话、项目或 Agent" />
@@ -71,6 +69,7 @@
                 <option value="awaiting_review">等待验收</option>
                 <option value="interrupted">任务中断</option>
                 <option value="closed">已关闭</option>
+                <option value="unknown">状态未知</option>
               </select>
             </div>
           </div>
@@ -78,13 +77,20 @@
         </section>
       </section>
 
-      <section id="tools" class="page">
+      <section id="agents" class="page">
         <header>
           <div>
-            <h1>Agent 接入</h1>
-            <p>只有支持内部会话发现、状态读取和精确恢复的 Agent，才算完整接入。</p>
+            <p class="eyebrow">CONNECTION PROFILES</p>
+            <h1>Agent 配置</h1>
+            <p>同一产品可以有多个独立 Profile，例如 OpenCode Desktop 与 OpenCode Server。</p>
           </div>
+          <button class="button primary" id="addAgentBtn">新增 Profile</button>
         </header>
+
+        <div class="profile-note">
+          <strong>密钥不写入配置文件。</strong>
+          OpenCode Server Profile 只保存环境变量名称，运行时再读取对应密码。
+        </div>
         <div class="tool-grid" id="toolGrid"></div>
       </section>
     </main>
@@ -93,11 +99,15 @@
   <div id="modal" class="modal hidden">
     <div class="modal-card">
       <div class="modal-head">
-        <h3 id="modalTitle">操作结果</h3>
-        <button id="modalClose">×</button>
+        <div>
+          <p class="eyebrow">AGENTHUB</p>
+          <h3 id="modalTitle">操作结果</h3>
+        </div>
+        <button class="icon-button" id="modalClose" aria-label="关闭">×</button>
       </div>
       <div id="modalContent" class="modal-content"></div>
       <div class="modal-foot">
+        <button class="button" id="modalCancel">取消</button>
         <button class="button primary" id="modalOk">确定</button>
       </div>
     </div>

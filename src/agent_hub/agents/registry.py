@@ -23,3 +23,17 @@ class AgentRegistry:
 
     def profile_ids(self) -> set[str]:
         return set(self._profiles)
+
+    def replace(self, profiles: Iterable[AgentProfile]) -> None:
+        profile_list = list(profiles)
+        replacement = {profile.id: profile.model_copy(deep=True) for profile in profile_list}
+        if len(replacement) != len(profile_list):
+            raise ValueError("Agent Profile ID 必须唯一。")
+        self._profiles = replacement
+
+    def set_connection(self, agent_id: str, connected: bool, message: str) -> None:
+        profile = self._profiles.get(agent_id)
+        if profile is None:
+            return
+        profile.connected = connected
+        profile.last_probe_message = message

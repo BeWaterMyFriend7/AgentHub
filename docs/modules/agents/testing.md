@@ -21,3 +21,9 @@
 - Profile 的新增、编辑、校验、启停和错误反馈。
 - 同一 Agent 产品的多个 Profile 可独立展示。
 - 会话观察、任务执行与 Skill、MCP、插件支持状态分别显示。
+
+## 当前自动化覆盖
+
+- `test_agent_profile_store.py` 验证同一产品的 Desktop/Server Profile 可并存，且配置文件只保存密码环境变量名，不保存密码值。
+- `test_application.py` 验证 Adapter 类型目录与 Profile 新增、编辑、启停、删除 API，并确认配置变更后 Runtime 立即重载。
+- 浏览器真实验收验证动态配置字段、连接状态、Profile 探测结果与 200 个真实会话展示。

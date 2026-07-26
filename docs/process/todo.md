@@ -3,7 +3,7 @@
 ## 基础建设
 
 - [x] 使用标准库 `unittest` 与 FastAPI `TestClient` 为 Agent Registry、会话聚合、API 响应和迁移兼容层建立基线测试。
-- [ ] 使用持久化的 Agent Adapter 配置替换纯 Mock 配置。
+- [x] 使用持久化的 Agent Adapter 配置替换纯 Mock 配置。
 - [x] 将 SkillBridge 的 Skill 扫描、聚合、共享、备份与回滚逻辑提取到 AgentHub 模块。
 - [x] 建立 Windows Junction、macOS/Linux Symbolic Link 平台适配 Interface。
 - [x] 完成 SkillBridge 逐文件迁移记录，并从正式源码树移除独立旧应用。
@@ -64,3 +64,32 @@
 - [ ] 增加来源删除取消、预检失败、部分失败补偿和永久清除 BDD 验证。
 
 各项测试与证据分别归档到对应模块的 `testing.md`、`bdd/` 和 `verification/`；跨模块场景按主要业务责任归档，并在其他模块文档中引用。
+
+## 2026-07-26 OpenCode 接入进展
+
+- [x] 通过官方 OpenCode Server/API 列出多个真实内部会话，并保留稳定原生会话 ID。
+- [x] 读取真实 Todo、最近消息和原生活动状态；缺失状态保持 unknown，不推断完成。
+- [x] 使用官方 CLI `attach --session` 启动指定原生会话恢复，并确认进程保持运行。
+- [x] 增加真实 OpenCode Adapter、公共契约测试和本机验证脚本。
+- [ ] 人工观察 TUI，确认恢复后展示的内容与指定原生会话一致；完成前保持“部分接入”结论。
+- [ ] 后续接入 OpenCode 事件流；当前版本明确采用轮询，不声明实时事件能力。
+
+## 2026-07-26 Codex 接入进展
+
+- [x] 通过 `state_5.sqlite` 列出 100 个真实 Codex 任务，并验证两次扫描的原生 Thread ID 稳定。
+- [x] 通过 rollout 原生生命周期事件识别执行中、等待输入、已结束和执行中断；缺失证据保持 `unknown`。
+- [x] 读取当前轮次原生 `update_plan` 和最近 Agent 活动，不生成虚假步骤。
+- [x] 使用 `codex://threads/<thread-id>` 深链精确定位 Codex Desktop 任务。
+- [x] 增加真实 Codex Adapter、公共契约测试和本机验证脚本。
+- [ ] 调研可供独立进程稳定消费的 Codex App Server 事件通道，补充等待授权和实时状态更新；完成前保持轮询接入。
+
+## 2026-07-27 统一 Agent 配置与 Desktop 接入
+
+- [x] 增加 `AgentProfileStore` 与配置页面，支持 Profile 新增、编辑、启停、删除和独立探测。
+- [x] 区分 Agent 产品与接入 Profile；OpenCode Desktop 和 OpenCode CLI/Server 可同时独立配置。
+- [x] 默认生产 Runtime 从真实 Profile 构造多个 Adapter，单个 Profile 失败不阻断其他 Agent。
+- [x] 只保存 OpenCode Server 密码环境变量名，不保存认证值。
+- [x] 直接读取 OpenCode Desktop SQLite，完成会话发现、状态映射、Todo 和原生 ID 恢复入口。
+- [x] 合并 Dashboard 刷新，避免统计、待处理和会话列表重复扫描同一批本地数据。
+- [x] 真实验证 Codex Desktop 与 OpenCode Desktop 各读取 100 个会话，两次扫描共 200 个 ID 全部稳定。
+- [ ] 会话跟进标记按用户要求暂缓，后续单独实现本地持久化和筛选。

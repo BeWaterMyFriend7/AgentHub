@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from agent_hub.agents.models import ProbeResult
 from agent_hub.agents.registry import AgentRegistry
 from agent_hub.sessions.adapters.base import SessionAdapter
@@ -31,12 +33,33 @@ class SessionHub:
 
     async def list_sessions(self) -> list[AgentSession]:
         sessions: list[AgentSession] = []
-        for adapter in self._adapters.values():
-            sessions.extend(await adapter.list_sessions())
+        items = list(self._adapters.items())
+        results = await asyncio.gather(
+            *(adapter.list_sessions() for _, adapter in items),
+            return_exceptions=True,
+        )
+        for (agent_id, _), result in zip(items, results, strict=True):
+            if isinstance(result, BaseException):
+                message = f"会话读取失败：{result}"
+                self._agents.set_connection(agent_id, False, message)
+                self._events.record(title="会话读取失败", detail=message, agent_id=agent_id)
+                continue
+            sessions.extend(result)
+            profile = self._agents.profile_for(agent_id)
+            message = (
+                profile.last_probe_message
+                if profile is not None and profile.last_probe_message != "尚未探测"
+                else f"成功读取 {len(result)} 个会话"
+            )
+            self._agents.set_connection(agent_id, True, message)
         return sorted(sessions, key=lambda item: item.updated_at, reverse=True)
 
     async def summary(self) -> SessionSummary:
         sessions = await self.list_sessions()
+        return self.summarize(sessions)
+
+    @staticmethod
+    def summarize(sessions: list[AgentSession]) -> SessionSummary:
         return SessionSummary(
             total=len(sessions),
             executing=sum(item.status == SessionStatus.EXECUTING for item in sessions),
@@ -55,6 +78,14 @@ class SessionHub:
             attention=sum(item.attention_required for item in sessions),
         )
 
+    async def dashboard(self) -> dict[str, object]:
+        sessions = await self.list_sessions()
+        return {
+            "summary": self.summarize(sessions),
+            "sessions": sessions,
+            "attention": [item for item in sessions if item.attention_required],
+        }
+
     async def attention_sessions(self) -> list[AgentSession]:
         return [item for item in await self.list_sessions() if item.attention_required]
 
@@ -70,15 +101,24 @@ class SessionHub:
                 failures=["Agent ID 不存在。"],
             )
         elif adapter is None:
+            configuration_failure = profile.last_probe_message
+            if configuration_failure == "尚未探测":
+                configuration_failure = "当前 Profile 不支持或尚未接入内部会话。"
             result = ProbeResult(
                 ok=False,
                 agent_id=agent_id,
                 title="接入探测失败",
-                message="该 Agent 尚未配置 Session Adapter。",
-                failures=["当前 Profile 不支持或尚未接入内部会话。"],
+                message=(
+                    "Agent Profile 已停用。"
+                    if not profile.enabled
+                    else "该 Agent 尚未配置 Session Adapter；请检查 Profile 配置。"
+                ),
+                failures=[configuration_failure],
             )
         else:
             result = await adapter.probe()
+
+        self._agents.set_connection(agent_id, result.ok, result.message if result.ok else "; ".join(result.failures))
 
         self._events.record(
             title=result.title,
@@ -88,7 +128,21 @@ class SessionHub:
         return result
 
     async def open_session(self, session_id: str) -> OpenSessionResult:
-        for agent_id, adapter in self._adapters.items():
+        preferred = sorted(
+            (
+                (agent_id, adapter)
+                for agent_id, adapter in self._adapters.items()
+                if session_id.startswith(f"{agent_id}:")
+            ),
+            key=lambda item: len(item[0]),
+            reverse=True,
+        )
+        remaining = [
+            (agent_id, adapter)
+            for agent_id, adapter in self._adapters.items()
+            if all(agent_id != preferred_id for preferred_id, _ in preferred)
+        ]
+        for agent_id, adapter in [*preferred, *remaining]:
             sessions = await adapter.list_sessions()
             if any(item.id == session_id for item in sessions):
                 result = await adapter.open_session(session_id)
