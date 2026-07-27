@@ -19,7 +19,7 @@ class AgentCandidate(BaseModel):
     name: str
     description: str
     data_path: str | None = None
-    endpoint: str | None = None
+    endpoint: str = ""
     executable: str | None = None
     confidence: Literal["high", "medium", "low"] = "medium"
     check_details: list[str] = []
@@ -44,44 +44,8 @@ class AgentDiscovery:
         candidates: list[AgentCandidate] = []
         system = platform.system()
 
-        # Claude Code Desktop
-        if system == "Windows":
-            appdata = os.getenv("APPDATA")
-            if appdata:
-                claude_dir = Path(appdata) / "Claude"
-                if claude_dir.exists():
-                    candidates.append(
-                        AgentCandidate(
-                            agent_type="claude_code",
-                            adapter_kind="claude_desktop",
-                            name="Claude Code Desktop",
-                            description="通过本地数据文件读取会话",
-                            data_path=str(claude_dir),
-                            confidence="high" if (claude_dir / "sessions").exists() else "medium",
-                            check_details=[
-                                f"发现目录: {claude_dir}",
-                                "建议：验证是否存在会话数据",
-                            ],
-                        )
-                    )
-        elif system == "Darwin":
-            home = Path.home()
-            claude_dir = home / "Library" / "Application Support" / "Claude"
-            if claude_dir.exists():
-                candidates.append(
-                    AgentCandidate(
-                        agent_type="claude_code",
-                        adapter_kind="claude_desktop",
-                        name="Claude Code Desktop",
-                        description="通过本地数据文件读取会话",
-                        data_path=str(claude_dir),
-                        confidence="high" if (claude_dir / "sessions").exists() else "medium",
-                        check_details=[
-                            f"发现目录: {claude_dir}",
-                            "建议：验证是否存在会话数据",
-                        ],
-                    )
-                )
+        # Claude Code Desktop - 暂时不支持，跳过
+        # Claude Code 使用不同的数据结构，需要专门的 Adapter
 
         # Claude Code CLI
         claude_cli = shutil.which("claude")
@@ -91,10 +55,13 @@ class AgentDiscovery:
                     agent_type="claude_code",
                     adapter_kind="claude_cli",
                     name="Claude Code CLI",
-                    description="通过 CLI 命令行工具",
+                    description="通过 CLI 命令行工具（暂不支持自动添加）",
                     executable=claude_cli,
-                    confidence="high",
-                    check_details=[f"发现可执行文件: {claude_cli}"],
+                    confidence="low",
+                    check_details=[
+                        f"发现可执行文件: {claude_cli}",
+                        "需要手动配置具体参数"
+                    ],
                 )
             )
 
