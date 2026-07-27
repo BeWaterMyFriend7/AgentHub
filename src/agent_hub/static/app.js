@@ -14,6 +14,7 @@ const statusText = {
 let sessions = [];
 let agents = [];
 let adapterTypes = [];
+let discoveredCandidates = [];
 let modalAction = null;
 
 async function api(url, options = {}) {
@@ -63,14 +64,14 @@ function initials(name) {
 
 function renderStats(summary) {
   const cards = [
-    ["会话总数", summary.total, "ALL"],
-    ["执行中", summary.executing, "RUN"],
-    ["等待介入", summary.waiting, "WAIT"],
-    ["等待验收", summary.awaiting_review, "REVIEW"],
-    ["任务中断", summary.interrupted, "STOP"],
+    ["会话总数", summary.total, "ALL", "all"],
+    ["执行中", summary.executing, "RUN", "executing"],
+    ["等待介入", summary.waiting, "WAIT", "waiting"],
+    ["等待验收", summary.awaiting_review, "REVIEW", "awaiting_review"],
+    ["任务中断", summary.interrupted, "STOP", "interrupted"],
   ];
-  $("#stats").innerHTML = cards.map(([label, value, code]) => `
-    <article class="stat">
+  $("#stats").innerHTML = cards.map(([label, value, code, filterValue]) => `
+    <article class="stat" data-filter-status="${filterValue}">
       <div class="stat-code">${code}</div>
       <div class="stat-value">${value}</div>
       <div class="stat-label">${label}</div>
@@ -108,8 +109,10 @@ function planPercent(session) {
 function sessionCard(session) {
   const hasPlan = session.total_steps > 0;
   const percent = planPercent(session);
+  const ignoredClass = session.ignored ? "ignored" : "";
+  const ignoredBadge = session.ignored ? '<span class="badge ignored-badge">已忽略</span>' : "";
   return `
-    <article class="session-card">
+    <article class="session-card ${ignoredClass}">
       <div class="agent-avatar">${initials(session.agent_name)}</div>
       <div class="session-main">
         <div class="session-title">
@@ -117,7 +120,10 @@ function sessionCard(session) {
             <div class="card-kicker">${escapeHtml(session.agent_name)} · ${escapeHtml(session.project_name)}</div>
             <h3>${escapeHtml(session.title)}</h3>
           </div>
-          <span class="badge ${session.status}">${statusText[session.status]}</span>
+          <div class="badges">
+            <span class="badge ${session.status}">${statusText[session.status]}</span>
+            ${ignoredBadge}
+          </div>
         </div>
         <p class="goal">${escapeHtml(session.current_goal || session.status_reason)}</p>
         <div class="session-meta">来源：${escapeHtml(session.status_source)} · 可信度：${escapeHtml(session.confidence)}</div>
@@ -128,7 +134,14 @@ function sessionCard(session) {
         ${hasPlan ? `<div class="progress"><span style="width:${percent}%"></span></div>` : ""}
         ${session.current_step ? `<div class="current-step">当前：${escapeHtml(session.current_step)}</div>` : ""}
       </div>
-      <button class="button small" data-open-session="${escapeHtml(session.id)}" ${session.resumable ? "" : "disabled"}>打开会话</button>
+      <div class="session-actions">
+        <button class="button small" data-open-session="${escapeHtml(session.id)}" ${session.resumable ? "" : "disabled"}>打开会话</button>
+        ${session.status === "interrupted" ? `
+          <button class="button small ghost" data-ignore-session="${escapeHtml(session.id)}" data-ignored="${session.ignored}">
+            ${session.ignored ? "取消忽略" : "忽略"}
+          </button>
+        ` : ""}
+      </div>
     </article>
   `;
 }
@@ -136,9 +149,13 @@ function sessionCard(session) {
 function renderSessions() {
   const keyword = $("#searchInput").value.trim().toLowerCase();
   const status = $("#statusFilter").value;
+  const showIgnored = $("#showIgnored").checked;
   const filtered = sessions.filter(session => {
     const text = [session.agent_name, session.title, session.project_name, session.current_goal, session.current_step].join(" ").toLowerCase();
-    return (!keyword || text.includes(keyword)) && (status === "all" || session.status === status);
+    const keywordMatch = !keyword || text.includes(keyword);
+    const statusMatch = status === "all" || session.status === status;
+    const ignoredMatch = showIgnored || !session.ignored;
+    return keywordMatch && statusMatch && ignoredMatch;
   });
   $("#sessionList").innerHTML = filtered.length
     ? filtered.map(sessionCard).join("")
@@ -210,7 +227,33 @@ async function loadData(showToast = false) {
   }
 }
 
-async function openSession(sessionId) {
+async function discoverAgents() {
+  try {
+    const result = await api("/api/agents/discover");
+    discoveredCandidates = result.candidates;
+    if (discoveredCandidates.length === 0) {
+      toast("未发现已安装的 Agent");
+      return;
+    }
+    showDiscoveryModal();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+async function ignoreSession(sessionId, currentlyIgnored) {
+  try {
+    const newIgnored = !currentlyIgnored;
+    await api(`/api/sessions/${encodeURIComponent(sessionId)}/ignore`, {
+      method: "POST",
+      body: JSON.stringify({ ignored: newIgnored }),
+    });
+    toast(newIgnored ? "会话已忽略" : "已取消忽略");
+    await loadData();
+  } catch (error) {
+    toast(error.message);
+  }
+}
   try {
     const result = await api(`/api/sessions/${encodeURIComponent(sessionId)}/open`, { method: "POST" });
     showModal(result.ok ? "会话恢复已启动" : "无法打开会话", `
@@ -270,7 +313,74 @@ function renderDynamicFields(profile = null) {
   `;
 }
 
-function openProfileForm(profile = null) {
+function showDiscoveryModal() {
+  const candidatesList = discoveredCandidates.map((candidate, index) => {
+    const confidenceBadge = {
+      high: '<span class="confidence-badge high">高可信</span>',
+      medium: '<span class="confidence-badge medium">中等</span>',
+      low: '<span class="confidence-badge low">需配置</span>',
+    }[candidate.confidence];
+    return `
+      <div class="discovery-card">
+        <div class="discovery-head">
+          <label class="discovery-checkbox">
+            <input type="checkbox" data-candidate-index="${index}" ${candidate.confidence !== "low" ? "checked" : ""} />
+            <div>
+              <strong>${escapeHtml(candidate.name)}</strong>
+              <span>${escapeHtml(candidate.description)}</span>
+            </div>
+          </label>
+          ${confidenceBadge}
+        </div>
+        <div class="discovery-details">
+          ${candidate.check_details.map(detail => `<div>• ${escapeHtml(detail)}</div>`).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  showModal("发现 Agent 候选配置", `
+    <div class="discovery-list">
+      <p class="discovery-intro">已在本机发现以下 Agent，可选择添加到 AgentHub：</p>
+      ${candidatesList}
+      <p class="discovery-note">提示：添加后可在 Agent 配置页面修改路径和参数</p>
+    </div>
+  `, {
+    confirmText: "添加选中项",
+    onConfirm: async () => {
+      const selected = [...document.querySelectorAll("[data-candidate-index]:checked")].map(
+        el => discoveredCandidates[parseInt(el.dataset.candidateIndex)]
+      );
+      if (selected.length === 0) {
+        toast("未选择任何 Agent");
+        return false;
+      }
+      let successCount = 0;
+      for (const candidate of selected) {
+        try {
+          await api("/api/agents", {
+            method: "POST",
+            body: JSON.stringify({
+              name: candidate.name,
+              agent_type: candidate.agent_type,
+              adapter_kind: candidate.adapter_kind,
+              data_path: candidate.data_path,
+              endpoint: candidate.endpoint,
+              executable: candidate.executable,
+              enabled: true,
+            }),
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`添加 ${candidate.name} 失败:`, error);
+        }
+      }
+      toast(`成功添加 ${successCount} 个 Agent Profile`);
+      await loadData();
+      return true;
+    },
+  });
+}
   const initialKind = profile?.adapter_kind || adapterTypes[0]?.kind;
   if (!initialKind) {
     toast("没有可用的 Adapter 类型");
@@ -361,6 +471,19 @@ document.addEventListener("click", event => {
   if (toggle) toggleProfile(agents.find(item => item.id === toggle.dataset.toggleAgent));
   const remove = event.target.closest("[data-delete-agent]");
   if (remove) confirmDelete(agents.find(item => item.id === remove.dataset.deleteAgent));
+  const stat = event.target.closest("[data-filter-status]");
+  if (stat) {
+    const status = stat.dataset.filterStatus;
+    // 处理"等待介入"的特殊情况，需要多个状态
+    if (status === "waiting") {
+      $("#statusFilter").value = "waiting_permission";
+    } else {
+      $("#statusFilter").value = status;
+    }
+    $("#statusFilter").dispatchEvent(new Event("change"));
+  }
+  const ignore = event.target.closest("[data-ignore-session]");
+  if (ignore) ignoreSession(ignore.dataset.ignoreSession, ignore.dataset.ignored === "true");
 });
 
 $("#modalOk").addEventListener("click", async () => {
@@ -380,8 +503,10 @@ $("#modalCancel").addEventListener("click", closeModal);
 $("#modal").addEventListener("click", event => { if (event.target.id === "modal") closeModal(); });
 $("#searchInput").addEventListener("input", renderSessions);
 $("#statusFilter").addEventListener("change", renderSessions);
+$("#showIgnored").addEventListener("change", renderSessions);
 $("#refreshBtn").addEventListener("click", () => loadData(true));
 $("#addAgentBtn").addEventListener("click", () => openProfileForm());
+$("#discoverAgentsBtn").addEventListener("click", discoverAgents);
 
 loadData();
 setInterval(() => loadData(false), 30000);

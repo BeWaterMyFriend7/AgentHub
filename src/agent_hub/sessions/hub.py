@@ -5,6 +5,7 @@ import asyncio
 from agent_hub.agents.models import ProbeResult
 from agent_hub.agents.registry import AgentRegistry
 from agent_hub.sessions.adapters.base import SessionAdapter
+from agent_hub.sessions.annotations import SessionAnnotationStore
 from agent_hub.sessions.events import SessionEventLog
 from agent_hub.sessions.models import (
     AgentSession,
@@ -22,10 +23,12 @@ class SessionHub:
         agents: AgentRegistry,
         adapters: dict[str, SessionAdapter],
         events: SessionEventLog,
+        annotations: SessionAnnotationStore | None = None,
     ) -> None:
         self._agents = agents
         self._adapters = dict(adapters)
         self._events = events
+        self._annotations = annotations or SessionAnnotationStore()
 
         unknown = self._adapters.keys() - agents.profile_ids()
         if unknown:
@@ -44,6 +47,12 @@ class SessionHub:
                 self._agents.set_connection(agent_id, False, message)
                 self._events.record(title="会话读取失败", detail=message, agent_id=agent_id)
                 continue
+            # 应用注释信息到会话
+            for session in result:
+                annotation = self._annotations.get(session.id)
+                session.ignored = annotation.ignored
+                session.follow_up = annotation.follow_up
+                session.tags = annotation.tags
             sessions.extend(result)
             profile = self._agents.profile_for(agent_id)
             message = (
@@ -161,3 +170,11 @@ class SessionHub:
             action="none",
             message="没有找到该会话。",
         )
+
+    def set_session_ignored(self, session_id: str, ignored: bool) -> None:
+        """设置会话的忽略状态。"""
+        self._annotations.set_ignored(session_id, ignored)
+
+    def set_session_follow_up(self, session_id: str, follow_up: bool) -> None:
+        """设置会话的跟进标记。"""
+        self._annotations.set_follow_up(session_id, follow_up)

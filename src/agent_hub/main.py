@@ -63,6 +63,12 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     async def get_agent_types():
         return active_runtime.adapter_definitions()
 
+    @application.get("/api/agents/discover")
+    async def discover_agents():
+        from agent_hub.agents.discovery import AgentDiscovery
+        candidates = AgentDiscovery.discover_all()
+        return {"candidates": [c.model_dump() for c in candidates]}
+
     @application.post("/api/agents", status_code=201)
     async def create_agent(payload: AgentProfileInput):
         try:
@@ -116,6 +122,16 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
         if not result.ok and result.action == "none":
             raise HTTPException(status_code=404, detail=result.message)
         return result
+
+    @application.post("/api/sessions/{session_id}/ignore")
+    async def ignore_session(session_id: str, ignored: bool = True):
+        active_runtime.sessions.set_session_ignored(session_id, ignored)
+        return {"ok": True, "session_id": session_id, "ignored": ignored}
+
+    @application.post("/api/sessions/{session_id}/follow-up")
+    async def follow_up_session(session_id: str, follow_up: bool = True):
+        active_runtime.sessions.set_session_follow_up(session_id, follow_up)
+        return {"ok": True, "session_id": session_id, "follow_up": follow_up}
 
     @application.post("/api/demo/tick")
     async def demo_tick():

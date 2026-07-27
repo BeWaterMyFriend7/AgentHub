@@ -49,10 +49,13 @@ class AgentSession(BaseModel):
     status_source: str
     confidence: Literal["high", "medium", "low"]
     resumable: bool = True
+    ignored: bool = False
+    follow_up: bool = False
+    tags: list[str] = Field(default_factory=list)
 
     @property
     def attention_required(self) -> bool:
-        return self.status in ATTENTION_STATUSES
+        return self.status in ATTENTION_STATUSES and not self.ignored
 
     @property
     def completed_steps(self) -> int:

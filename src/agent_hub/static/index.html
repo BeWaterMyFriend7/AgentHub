@@ -71,6 +71,10 @@
                 <option value="closed">已关闭</option>
                 <option value="unknown">状态未知</option>
               </select>
+              <label class="toggle-filter">
+                <input type="checkbox" id="showIgnored" />
+                <span>显示已忽略</span>
+              </label>
             </div>
           </div>
           <div class="session-list" id="sessionList"></div>
@@ -84,7 +88,10 @@
             <h1>Agent 配置</h1>
             <p>同一产品可以有多个独立 Profile，例如 OpenCode Desktop 与 OpenCode Server。</p>
           </div>
-          <button class="button primary" id="addAgentBtn">新增 Profile</button>
+          <div class="header-actions">
+            <button class="button" id="discoverAgentsBtn">自动探测</button>
+            <button class="button primary" id="addAgentBtn">新增 Profile</button>
+          </div>
         </header>
 
         <div class="profile-note">
