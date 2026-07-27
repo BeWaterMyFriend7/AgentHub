@@ -102,6 +102,13 @@ function renderAttention(items) {
     : '<div class="empty">当前没有需要人工介入的会话。</div>';
 }
 
+function renderExecuting(items) {
+  $("#executingCount").textContent = items.length;
+  $("#executingList").innerHTML = items.length
+    ? items.map(attentionCard).join("")
+    : '<div class="empty">当前没有正在执行的会话。</div>';
+}
+
 function planPercent(session) {
   return session.total_steps ? Math.round(session.completed_steps / session.total_steps * 100) : 0;
 }
@@ -129,17 +136,10 @@ function sessionCard(session) {
         <div class="session-meta">来源：${escapeHtml(session.status_source)} · 可信度：${escapeHtml(session.confidence)}</div>
         ${session.last_activity ? `<div class="activity">${escapeHtml(session.last_activity)}</div>` : ""}
       </div>
-      <div class="plan ${hasPlan ? "" : "no-plan"}">
-        <div class="plan-head"><span>Todo 进度</span><strong>${hasPlan ? `${session.completed_steps} / ${session.total_steps}` : "未提供"}</strong></div>
-        ${hasPlan ? `<div class="progress"><span style="width:${percent}%"></span></div>` : ""}
-        ${session.current_step ? `<div class="current-step">当前：${escapeHtml(session.current_step)}</div>` : ""}
-      </div>
       <div class="session-actions">
         <button class="button small" data-open-session="${escapeHtml(session.id)}" ${session.resumable ? "" : "disabled"}>打开会话</button>
         ${session.status === "interrupted" ? `
-          <button class="button small ghost" data-ignore-session="${escapeHtml(session.id)}" data-ignored="${session.ignored}">
-            ${session.ignored ? "取消忽略" : "忽略"}
-          </button>
+          <button class="button small primary" data-mark-complete="${escapeHtml(session.id)}">标记完成</button>
         ` : ""}
       </div>
     </article>
@@ -219,6 +219,8 @@ async function loadData(showToast = false) {
     adapterTypes = types;
     renderStats(dashboard.summary);
     renderAttention(dashboard.attention);
+    const executing = sessions.filter(s => s.status === "executing");
+    renderExecuting(executing);
     renderSessions();
     renderAgents();
     if (showToast) toast("会话状态已刷新");
@@ -241,14 +243,12 @@ async function discoverAgents() {
   }
 }
 
-async function ignoreSession(sessionId, currentlyIgnored) {
+async function markSessionComplete(sessionId) {
   try {
-    const newIgnored = !currentlyIgnored;
-    await api(`/api/sessions/${encodeURIComponent(sessionId)}/ignore`, {
+    await api(`/api/sessions/${encodeURIComponent(sessionId)}/mark-complete`, {
       method: "POST",
-      body: JSON.stringify({ ignored: newIgnored }),
     });
-    toast(newIgnored ? "会话已忽略" : "已取消忽略");
+    toast("会话已标记为完成");
     await loadData();
   } catch (error) {
     toast(error.message);
@@ -366,9 +366,9 @@ function showDiscoveryModal() {
               name: candidate.name,
               agent_type: candidate.agent_type,
               adapter_kind: candidate.adapter_kind,
-              data_path: candidate.data_path,
-              endpoint: candidate.endpoint,
-              executable: candidate.executable,
+              data_path: candidate.data_path || null,
+              endpoint: candidate.endpoint || "",
+              executable: candidate.executable || null,
               enabled: true,
             }),
           });
@@ -486,8 +486,8 @@ document.addEventListener("click", event => {
     }
     $("#statusFilter").dispatchEvent(new Event("change"));
   }
-  const ignore = event.target.closest("[data-ignore-session]");
-  if (ignore) ignoreSession(ignore.dataset.ignoreSession, ignore.dataset.ignored === "true");
+  const ignore = event.target.closest("[data-mark-complete]");
+  if (ignore) markSessionComplete(ignore.dataset.markComplete);
 });
 
 $("#modalOk").addEventListener("click", async () => {

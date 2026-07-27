@@ -128,6 +128,12 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
         active_runtime.sessions.set_session_ignored(session_id, ignored)
         return {"ok": True, "session_id": session_id, "ignored": ignored}
 
+    @application.post("/api/sessions/{session_id}/mark-complete")
+    async def mark_session_complete(session_id: str):
+        # 标记为完成实际上就是忽略该会话
+        active_runtime.sessions.set_session_ignored(session_id, True)
+        return {"ok": True, "session_id": session_id, "message": "会话已标记为完成"}
+
     @application.post("/api/sessions/{session_id}/follow-up")
     async def follow_up_session(session_id: str, follow_up: bool = True):
         active_runtime.sessions.set_session_follow_up(session_id, follow_up)

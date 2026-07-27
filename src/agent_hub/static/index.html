@@ -42,16 +42,29 @@
 
         <div class="stats" id="stats"></div>
 
-        <section class="panel attention-panel">
-          <div class="panel-head">
-            <div>
-              <h2>需要处理</h2>
-              <p>仅展示具有可靠中断、等待或验收依据的会话。</p>
+        <div class="split-panels">
+          <section class="panel attention-panel">
+            <div class="panel-head">
+              <div>
+                <h2>需要处理</h2>
+                <p>等待授权、输入、验收或已中断的会话。</p>
+              </div>
+              <span class="count-badge" id="attentionCount">0</span>
             </div>
-            <span class="count-badge" id="attentionCount">0</span>
-          </div>
-          <div class="attention-grid" id="attentionList"></div>
-        </section>
+            <div class="attention-grid" id="attentionList"></div>
+          </section>
+
+          <section class="panel executing-panel">
+            <div class="panel-head">
+              <div>
+                <h2>运行中</h2>
+                <p>正在执行的会话。</p>
+              </div>
+              <span class="count-badge" id="executingCount">0</span>
+            </div>
+            <div class="executing-list" id="executingList"></div>
+          </section>
+        </div>
 
         <section class="panel">
           <div class="panel-head session-head">
