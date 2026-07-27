@@ -254,6 +254,8 @@ async function ignoreSession(sessionId, currentlyIgnored) {
     toast(error.message);
   }
 }
+
+async function openSession(sessionId) {
   try {
     const result = await api(`/api/sessions/${encodeURIComponent(sessionId)}/open`, { method: "POST" });
     showModal(result.ok ? "会话恢复已启动" : "无法打开会话", `
@@ -381,6 +383,8 @@ function showDiscoveryModal() {
     },
   });
 }
+
+function openProfileForm(profile = null) {
   const initialKind = profile?.adapter_kind || adapterTypes[0]?.kind;
   if (!initialKind) {
     toast("没有可用的 Adapter 类型");
