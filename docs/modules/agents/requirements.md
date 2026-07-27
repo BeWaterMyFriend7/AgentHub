@@ -10,9 +10,22 @@
 
 - 识别 Agent 产品类型和本机安装实例。
 - 创建、编辑、启用、停用并验证 `AgentProfile`。
+- 自动探测主流 Agent（Claude Code、Codex、OpenCode、Hermes）的 Desktop 和 CLI 安装。
 - 保存 Adapter 所需的 API 端点、Hook、数据位置、能力目录、原生配置位置和 CLI 恢复方式。
 - 展示最近连接状态、失败原因和各能力支持等级。
 - 注册 Agent Adapter，并向其他模块提供稳定的 Agent 身份和能力声明。
+
+## Agent 自动探测
+
+- 支持自动探测本地已安装的主流 Agent：Claude Code、Codex、OpenCode、Hermes。
+- 每种 Agent 的 Desktop 版本和 CLI 版本分开探测和配置。
+- 探测结果显示可信度等级：
+  - 高可信：发现明确的数据库文件或可执行文件，路径准确。
+  - 中等：发现相关目录但缺少关键文件，可能需要验证。
+  - 需配置：Agent 类型存在但需要手动配置端点或密码（如 OpenCode Server）。
+- 探测结果可由用户选择性添加，添加后允许修改路径和参数以适应非标准安装。
+- 探测逻辑适配 Windows、macOS、Linux 平台的标准安装路径。
+- 探测过程不修改任何 Agent 原生配置或文件系统。
 
 ## 业务规则
 
@@ -28,4 +41,6 @@
 - 至少能够配置并区分同一 Agent 产品的多个安装或 Profile。
 - Profile 校验失败时展示可操作的原因，不影响其他 Profile。
 - Sessions、Workflows 和 Capabilities 通过稳定 Agent ID 使用配置，不直接读取 UI 表单状态。
-- Windows、macOS、Linux 上的路径和可执行文件探测结果可明确区分“未安装”“无权限”和“尚未验证”。
+- Windows、macOS、Linux 上的路径和可执行文件探测结果可明确区分”未安装””无权限”和”尚未验证”。
+- 自动探测功能在至少两个操作系统上成功发现已安装的 Agent，并能正确区分 Desktop 和 CLI 版本。
+- 探测到的 Agent 配置添加后可正常通过探测验证并读取会话。
