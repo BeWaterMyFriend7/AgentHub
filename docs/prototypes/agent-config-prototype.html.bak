@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent配置原型</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.container{max-width:1400px;margin:0 auto;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1)}.header{padding:20px 30px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center}.header h1{font-size:24px;color:#333}.btn{padding:8px 16px;border-radius:4px;border:none;cursor:pointer;font-size:14px;transition:all .2s}.btn-primary{background:#1976d2;color:#fff}.btn-primary:hover{background:#1565c0}.btn-secondary{background:#e0e0e0;color:#333;margin-right:8px}.btn-secondary:hover{background:#d0d0d0}.btn-text{background:transparent;color:#1976d2}.btn-text:hover{background:#f5f5f5}.btn-small{padding:6px 12px;font-size:13px}.content{padding:30px}.section-title{font-size:18px;color:#333;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px}.agent-card{border:1px solid #e0e0e0;border-radius:6px;padding:20px;background:#fff;transition:all .2s;position:relative}.agent-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}.agent-card.hidden{display:none}.agent-card-header{display:flex;align-items:center;margin-bottom:12px}.agent-icon{width:40px;height:40px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:20px;margin-right:12px}.agent-info h3{font-size:16px;color:#333;margin-bottom:4px}.agent-info .agent-type{font-size:12px;color:#666}.status-bar{width:4px;position:absolute;left:0;top:0;bottom:0;border-radius:6px 0 0 6px}.status-configured{background:#4caf50}.status-detected{background:#4caf50}.status-partial{background:#ff9800}.status-not-found{background:#9e9e9e}.status-needs-config{background:#2196f3}.detection-status{display:flex;align-items:center;margin:12px 0;padding:8px;border-radius:4px;font-size:14px}.status-configured-bg{background:#e8f5e9;color:#2e7d32}.status-detected-bg{background:#e8f5e9;color:#2e7d32}.status-partial-bg{background:#fff3e0;color:#e65100}.status-not-found-bg{background:#f5f5f5;color:#757575}.status-needs-config-bg{background:#e3f2fd;color:#1565c0}.status-icon{margin-right:8px;font-size:16px}.detection-path{font-size:12px;color:#666;margin:4px 0;padding:6px 8px;background:#fafafa;border-radius:4px;font-family:monospace}.card-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.badge{padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;margin-left:8px}.badge-enabled{background:#e8f5e9;color:#2e7d32}.badge-disabled{background:#ffebee;color:#c62828}.badge-hidden{background:#f5f5f5;color:#757575}.form-hint{font-size:12px;color:#999;margin-top:4px}.form-warning{font-size:12px;color:#ff9800;margin-top:4px}.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center}.modal.active{display:flex}.modal-content{background:#fff;border-radius:8px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}.modal-header{padding:20px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center}.modal-title{font-size:18px;font-weight:500}.modal-body{padding:20px}.modal-footer{padding:16px 20px;border-top:1px solid #e0e0e0;display:flex;justify-content:flex-end;gap:8px}.form-group{margin-bottom:16px}.form-label{display:block;font-size:14px;color:#333;margin-bottom:6px}.form-label .required{color:#f44336}.form-input{width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:4px;font-size:14px}.form-input:focus{outline:none;border-color:#1976d2}.annotation{display:inline-block;background:#1976d2;color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;margin-left:8px}.toast{position:fixed;top:20px;right:20px;background:#323232;color:#fff;padding:12px 20px;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:2000;opacity:0;transition:opacity .3s}.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>Agent 配置 <span class="annotation">原型1</span></h1>
+<div>
+<button class="btn btn-secondary" onclick="reDetect()">🔄 重新探测</button>
+<button class="btn btn-text" onclick="toggleHidden()" id="toggleBtn">👁️ 显示已隐藏 (2)</button>
+<button class="btn btn-primary" onclick="showManualConfig()">➕ 手动添加</button>
+</div>
+</div>
+<div class="content">
+<div class="section-title">
+<span>🤖 Agent 列表 <span class="annotation">原型1.1</span></span>
+<span style="font-size:14px;color:#666" id="countLabel">6 个 Agent (2 个已隐藏)</span>
+</div>
+<div class="agent-grid" id="agentGrid">
+<div class="agent-card" data-id="codex" data-hidden="false">
+<div class="status-bar status-configured"></div>
+<div class="agent-card-header">
+<div class="agent-icon">📟</div>
+<div class="agent-info">
+<h3>Codex Desktop<span class="badge badge-enabled">已启用</span></h3>
+<div class="agent-type">Desktop 版本</div>
+</div>
+</div>
+<div class="detection-status status-configured-bg">
+<span class="status-icon">✓</span>
+<span>已配置并验证通过</span>
+</div>
+<div class="detection-path">路径: ~/.codex</div>
+<div class="detection-path">状态: 连接成功，发现 5 个会话</div>
+<div class="form-hint">最后验证: 2 分钟前</div>
+<div class="card-actions">
+<button class="btn btn-secondary btn-small" onclick="editProfile('codex')">✏️ 编辑</button>
+<button class="btn btn-secondary btn-small" onclick="testConnection('codex')">🔄 测试</button>
+<button class="btn btn-secondary btn-small" onclick="disableProfile('codex')">⏸ 停用</button>
+<button class="btn btn-text btn-small" onclick="hideAgent('codex')">👁️ 隐藏</button>
+</div>
+</div>
+<div class="agent-card" data-id="opencode-desktop" data-hidden="false">
+<div class="status-bar status-detected"></div>
+<div class="agent-card-header">
+<div class="agent-icon">💻</div>
+<div class="agent-info">
+<h3>OpenCode Desktop</h3>
+<div class="agent-type">Desktop 版本</div>
+</div>
+</div>
+<div class="detection-status status-detected-bg">
+<span class="status-icon">✓</span>
+<span>已探测到</span>
+</div>
+<div class="detection-path">路径: ~/.local/share/opencode</div>
+<div class="detection-path">发现: opencode.db (2 个会话)</div>
+<div class="card-actions">
+<button class="btn btn-primary btn-small" onclick="quickAdd('opencode-desktop')">➕ 添加配置</button>
+<button class="btn btn-text btn-small" onclick="hideAgent('opencode-desktop')">👁️ 隐藏</button>
+</div>
+</div>
+<div class="agent-card" data-id="opencode-server" data-hidden="false">
+<div class="status-bar status-partial"></div>
+<div class="agent-card-header">
+<div class="agent-icon">🌐</div>
+<div class="agent-info">
+<h3>OpenCode Server<span class="badge badge-enabled">已启用</span></h3>
+<div class="agent-type">Server API</div>
+</div>
+</div>
+<div class="detection-status status-partial-bg">
+<span class="status-icon">⚠</span>
+<span>已配置，有警告</span>
+</div>
+<div class="detection-path">地址: http://localhost:8000</div>
+<div class="form-warning">⚠ CLI 工具未找到，精确恢复功能可能不可用</div>
+<div class="form-hint">最后验证: 10 分钟前</div>
+<div class="card-actions">
+<button class="btn btn-secondary btn-small" onclick="editProfile('opencode-server')">✏️ 编辑</button>
+<button class="btn btn-secondary btn-small" onclick="testConnection('opencode-server')">🔄 测试</button>
+<button class="btn btn-secondary btn-small" onclick="disableProfile('opencode-server')">⏸ 停用</button>
+<button class="btn btn-text btn-small" onclick="hideAgent('opencode-server')">👁️ 隐藏</button>
+</div>
+</div>
+<div class="agent-card" data-id="claude-code" data-hidden="false">
+<div class="status-bar status-needs-config"></div>
+<div class="agent-card-header">
+<div class="agent-icon">🤖</div>
+<div class="agent-info">
+<h3>Claude Code Desktop</h3>
+<div class="agent-type">Desktop 版本</div>
+</div>
+</div>
+<div class="detection-status status-needs-config-bg">
+<span class="status-icon">ℹ</span>
+<span>需手动配置</span>
+</div>
+<div class="form-hint">说明: 未在标准位置发现安装，如已安装请手动配置</div>
+<div class="card-actions">
+<button class="btn btn-primary btn-small" onclick="showConfigModal('claude-code')">⚙️ 配置</button>
+<button class="btn btn-text btn-small" onclick="hideAgent('claude-code')">👁️ 隐藏</button>
+</div>
+</div>
+<div class="agent-card hidden" data-id="hermes" data-hidden="true">
+<div class="status-bar status-not-found"></div>
+<div class="agent-card-header">
+<div class="agent-icon">🚀</div>
+<div class="agent-info">
+<h3>Hermes<span class="badge badge-hidden">已隐藏</span></h3>
+<div class="agent-type">Desktop 版本</div>
+</div>
+</div>
+<div class="detection-status status-not-found-bg">
+<span class="status-icon">○</span>
+<span>未探测到</span>
+</div>
+<div class="form-hint">说明: 未在标准位置发现安装</div>
+<div class="card-actions">
+<button class="btn btn-secondary btn-small" onclick="showConfigModal('hermes')">⚙️ 配置</button>
+<button class="btn btn-primary btn-small" onclick="showAgent('hermes')">👁️ 显示</button>
+</div>
+</div>
+<div class="agent-card hidden" data-id="aider" data-hidden="true">
+<div class="status-bar status-not-found"></div>
+<div class="agent-card-header">
+<div class="agent-icon">🔧</div>
+<div class="agent-info">
+<h3>Aider<span class="badge badge-disabled">已停用</span><span class="badge badge-hidden">已隐藏</span></h3>
+<div class="agent-type">CLI 版本</div>
+</div>
+</div>
+<div class="detection-status status-not-found-bg">
+<span class="status-icon">⏸</span>
+<span>已停用</span>
+</div>
+<div class="detection-path">CLI: /usr/local/bin/aider</div>
+<div class="form-hint">说明: 此 Agent 已停用，不会发现会话</div>
+<div class="card-actions">
+<button class="btn btn-primary btn-small" onclick="enableProfile('aider')">▶️ 启用</button>
+<button class="btn btn-secondary btn-small" onclick="editProfile('aider')">✏️ 编辑</button>
+<button class="btn btn-secondary btn-small" onclick="deleteProfile('aider')">🗑️ 删除</button>
+<button class="btn btn-primary btn-small" onclick="showAgent('aider')">👁️ 显示</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal" id="configModal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 class="modal-title" id="modalTitle">配置 Agent</h2>
+<button class="btn btn-secondary" onclick="closeModal()">✕</button>
+</div>
+<div class="modal-body">
+<div class="form-group">
+<label class="form-label">配置名称 <span class="required">*</span></label>
+<input type="text" class="form-input" id="profileName" placeholder="输入配置名称">
+<div class="form-hint">2-50 字符，同一类型下不能重名</div>
+</div>
+<div class="form-group">
+<label class="form-label">服务器地址 <span class="required">*</span></label>
+<input type="text" class="form-input" id="serverUrl" placeholder="http://localhost:8000">
+<div class="form-hint">格式: http://hostname:port</div>
+</div>
+<div class="form-group">
+<label class="form-label">密码环境变量 <span class="required">*</span></label>
+<input type="text" class="form-input" id="secretEnv" placeholder="OPENCODE_SERVER_PASSWORD">
+<div class="form-hint">存储密码的环境变量名，不存储实际密码</div>
+</div>
+<div class="form-group">
+<label class="form-label">CLI 可执行文件</label>
+<input type="text" class="form-input" id="cliPath" placeholder="opencode">
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-secondary" onclick="closeModal()">取消</button>
+<button class="btn btn-secondary" onclick="testConfig()">测试连接</button>
+<button class="btn btn-primary" onclick="saveConfig()">保存</button>
+</div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let showingHidden = false;
+function updateCount() {
+    const cards = document.querySelectorAll('.agent-card');
+    const hidden = document.querySelectorAll('.agent-card[data-hidden="true"]');
+    document.getElementById('countLabel').textContent = 
+        `${cards.length} 个 Agent (${hidden.length} 个已隐藏)`;
+}
+function toggleHidden() {
+    showingHidden = !showingHidden;
+    const hiddenCards = document.querySelectorAll('.agent-card[data-hidden="true"]');
+    hiddenCards.forEach(card => {
+        if (showingHidden) {
+            card.classList.remove('hidden');
+        } else {
+            card.classList.add('hidden');
+        }
+    });
+    const btn = document.getElementById('toggleBtn');
+    btn.textContent = showingHidden ? '👁️ 隐藏已隐藏' : `👁️ 显示已隐藏 (${hiddenCards.length})`;
+    showToast(showingHidden ? '已显示隐藏的 Agent' : '已隐藏');
+}
+function hideAgent(id) {
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) {
+        card.setAttribute('data-hidden', 'true');
+        if (!showingHidden) {
+            card.classList.add('hidden');
+        }
+        const badge = card.querySelector('h3');
+        if (!badge.querySelector('.badge-hidden')) {
+            badge.innerHTML += '<span class="badge badge-hidden">已隐藏</span>';
+        }
+        const hideBtn = card.querySelector('[onclick*="hideAgent"]');
+        if (hideBtn) {
+            hideBtn.textContent = '👁️ 显示';
+            hideBtn.setAttribute('onclick', `showAgent('${id}')`);
+        }
+        updateCount();
+        showToast(`已隐藏 ${id}`);
+    }
+}
+function showAgent(id) {
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) {
+        card.setAttribute('data-hidden', 'false');
+        card.classList.remove('hidden');
+        const badge = card.querySelector('.badge-hidden');
+        if (badge) badge.remove();
+        const showBtn = card.querySelector('[onclick*="showAgent"]');
+        if (showBtn) {
+            showBtn.textContent = '👁️ 隐藏';
+            showBtn.setAttribute('onclick', `hideAgent('${id}')`);
+        }
+        updateCount();
+        showToast(`已显示 ${id}`);
+    }
+}
+function reDetect() {
+    showToast('正在重新探测所有 Agent...');
+    setTimeout(() => {
+        showToast('探测完成！发现 4 个 Agent');
+    }, 1500);
+}
+function showManualConfig() {
+    document.getElementById('modalTitle').textContent = '手动添加 Agent';
+    document.getElementById('configModal').classList.add('active');
+}
+function quickAdd(id) {
+    showToast(`正在添加 ${id} 到配置列表...`);
+    setTimeout(() => {
+        const card = document.querySelector(`[data-id="${id}"]`);
+        card.querySelector('.status-bar').className = 'status-bar status-configured';
+        card.querySelector('.detection-status').className = 'detection-status status-configured-bg';
+        card.querySelector('.detection-status span:last-child').textContent = '已配置并验证通过';
+        card.querySelector('h3').innerHTML += '<span class="badge badge-enabled">已启用</span>';
+        card.querySelector('.card-actions').innerHTML = 
+            `<button class="btn btn-secondary btn-small" onclick="editProfile('${id}')">✏️ 编辑</button>
+             <button class="btn btn-secondary btn-small" onclick="testConnection('${id}')">🔄 测试</button>
+             <button class="btn btn-secondary btn-small" onclick="disableProfile('${id}')">⏸ 停用</button>
+             <button class="btn btn-text btn-small" onclick="hideAgent('${id}')">👁️ 隐藏</button>`;
+        showToast('添加成功！');
+    }, 800);
+}
+function editProfile(id) {
+    document.getElementById('modalTitle').textContent = `编辑 ${id}`;
+    document.getElementById('configModal').classList.add('active');
+    showToast(`打开 ${id} 编辑页面`);
+}
+function testConnection(id) {
+    showToast(`正在测试 ${id} 连接...`);
+    setTimeout(() => showToast('连接成功！'), 1000);
+}
+function disableProfile(id) {
+    if (confirm(`确定要停用 ${id} 吗？停用后不会发现该 Agent 的会话。`)) {
+        const card = document.querySelector(`[data-id="${id}"]`);
+        const badge = card.querySelector('.badge-enabled');
+        if (badge) {
+            badge.className = 'badge badge-disabled';
+            badge.textContent = '已停用';
+        }
+        showToast(`${id} 已停用`);
+    }
+}
+function enableProfile(id) {
+    const card = document.querySelector(`[data-id="${id}"]`);
+    const badge = card.querySelector('.badge-disabled');
+    if (badge) {
+        badge.className = 'badge badge-enabled';
+        badge.textContent = '已启用';
+    }
+    showToast(`${id} 已启用`);
+}
+function deleteProfile(id) {
+    if (confirm(`确定要删除 ${id} 配置吗？此操作不可恢复。`)) {
+        const card = document.querySelector(`[data-id="${id}"]`);
+        card.style.opacity = '0';
+        setTimeout(() => {
+            card.remove();
+            updateCount();
+            showToast(`${id} 已删除`);
+        }, 300);
+    }
+}
+function showConfigModal(id) {
+    document.getElementById('modalTitle').textContent = `配置 ${id}`;
+    document.getElementById('configModal').classList.add('active');
+}
+function closeModal() {
+    document.getElementById('configModal').classList.remove('active');
+}
+function testConfig() {
+    showToast('正在测试配置...');
+    setTimeout(() => showToast('测试成功！'), 1000);
+}
+function saveConfig() {
+    showToast('保存成功！');
+    closeModal();
+}
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+}
+</script>
+</body>
+</html>
