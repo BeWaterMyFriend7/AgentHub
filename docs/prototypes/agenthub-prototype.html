@@ -804,12 +804,37 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>项目:</label>
+                        <select id="project-filter" onchange="filterSessions()">
+                            <option value="all">全部项目</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>标签:</label>
                         <select id="tag-filter" onchange="filterSessions()">
                             <option value="all">全部标签</option>
                             <option value="待测试">待测试</option>
                             <option value="需讨论">需讨论</option>
                             <option value="优先级高">优先级高</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>状态:</label>
+                        <select id="status-filter" onchange="filterSessions()">
+                            <option value="all">全部状态</option>
+                            <option value="executing">执行中</option>
+                            <option value="waiting-auth">等待授权</option>
+                            <option value="waiting-input">等待输入</option>
+                            <option value="interrupted">执行中断</option>
+                            <option value="closed">已关闭</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>忽略:</label>
+                        <select id="ignored-filter" onchange="filterSessions()">
+                            <option value="all">全部</option>
+                            <option value="not-ignored">未忽略</option>
+                            <option value="ignored">已忽略</option>
                         </select>
                     </div>
                 </div>
@@ -940,14 +965,14 @@
 
         // ============ 会话管理数据 ============
         const sessions = [
-            {id: 1, title: 'API性能优化', project: 'backend-service', agent: 'codex', agentName: 'Codex Desktop', status: 'executing', tags: ['优先级高'], updateTime: '2分钟前'},
-            {id: 2, title: '用户认证重构', project: 'auth-module', agent: 'opencode', agentName: 'OpenCode Desktop', status: 'executing', tags: [], updateTime: '5分钟前'},
-            {id: 3, title: '数据库迁移', project: 'database', agent: 'codex', agentName: 'Codex Desktop', status: 'waiting-auth', tags: ['待测试'], updateTime: '10分钟前'},
-            {id: 4, title: '前端UI优化', project: 'frontend-app', agent: 'claude', agentName: 'Claude Code', status: 'waiting-input', tags: ['需讨论'], updateTime: '15分钟前'},
-            {id: 5, title: '日志系统升级', project: 'logging', agent: 'opencode', agentName: 'OpenCode Server', status: 'interrupted', tags: [], updateTime: '20分钟前'},
-            {id: 6, title: '缓存策略调整', project: 'cache-service', agent: 'codex', agentName: 'Codex Desktop', status: 'closed', tags: ['已完成'], updateTime: '1小时前'},
-            {id: 7, title: '单元测试补充', project: 'testing', agent: 'claude', agentName: 'Claude Code', status: 'closed', tags: [], updateTime: '2小时前'},
-            {id: 8, title: 'API文档更新', project: 'docs', agent: 'opencode', agentName: 'OpenCode Desktop', status: 'closed', tags: [], updateTime: '3小时前'}
+            {id: 1, title: 'API性能优化', project: 'backend-service', agent: 'codex', agentName: 'Codex Desktop', status: 'executing', tags: ['优先级高'], updateTime: '2分钟前', ignored: false},
+            {id: 2, title: '用户认证重构', project: 'auth-module', agent: 'opencode', agentName: 'OpenCode Desktop', status: 'executing', tags: [], updateTime: '5分钟前', ignored: false},
+            {id: 3, title: '数据库迁移', project: 'database', agent: 'codex', agentName: 'Codex Desktop', status: 'waiting-auth', tags: ['待测试'], updateTime: '10分钟前', ignored: false},
+            {id: 4, title: '前端UI优化', project: 'frontend-app', agent: 'claude', agentName: 'Claude Code', status: 'waiting-input', tags: ['需讨论'], updateTime: '15分钟前', ignored: false},
+            {id: 5, title: '日志系统升级', project: 'logging', agent: 'opencode', agentName: 'OpenCode Server', status: 'interrupted', tags: [], updateTime: '20分钟前', ignored: true},
+            {id: 6, title: '缓存策略调整', project: 'cache-service', agent: 'codex', agentName: 'Codex Desktop', status: 'closed', tags: ['已完成'], updateTime: '1小时前', ignored: false},
+            {id: 7, title: '单元测试补充', project: 'testing', agent: 'claude', agentName: 'Claude Code', status: 'closed', tags: [], updateTime: '2小时前', ignored: false},
+            {id: 8, title: 'API文档更新', project: 'docs', agent: 'opencode', agentName: 'OpenCode Desktop', status: 'closed', tags: [], updateTime: '3小时前', ignored: false}
         ];
 
         const allTags = ['待测试', '需讨论', '优先级高', '性能优化', '代码审查', '部署准备'];
@@ -984,7 +1009,12 @@
                 }[s.status];
 
                 const tagBadges = s.tags.map(tag => `<span class="badge badge-tag">${tag}</span>`).join('');
-                const ignoreBtn = s.status === 'interrupted' ? `<button class="btn btn-small" onclick="showIgnoreModal(${s.id})">🚫 忽略</button>` : '';
+                const ignoredBadge = s.ignored ? '<span class="badge badge-interrupted">已忽略</span>' : '';
+
+                // 忽略按钮：已忽略显示"取消忽略"，未忽略显示"忽略"
+                const ignoreBtn = s.ignored
+                    ? `<button class="btn btn-small" onclick="cancelIgnore(${s.id})">✅ 取消忽略</button>`
+                    : `<button class="btn btn-small" onclick="showIgnoreModal(${s.id})">🚫 忽略</button>`;
 
                 return `
                     <div class="session-card status-${s.status}">
@@ -993,6 +1023,7 @@
                                 <div class="session-title">
                                     ${s.title}
                                     <span class="badge badge-${s.status}">${statusText}</span>
+                                    ${ignoredBadge}
                                     ${tagBadges}
                                 </div>
                                 <div class="session-meta">
@@ -1047,13 +1078,22 @@
         function filterSessions() {
             const searchText = document.getElementById('search-input').value.toLowerCase();
             const agentFilter = document.getElementById('agent-filter').value;
+            const projectFilter = document.getElementById('project-filter').value;
             const tagFilter = document.getElementById('tag-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+            const ignoredFilter = document.getElementById('ignored-filter').value;
 
             let filtered = sessions.filter(s => {
                 const matchSearch = searchText === '' || s.title.toLowerCase().includes(searchText) || s.project.toLowerCase().includes(searchText);
                 const matchAgent = agentFilter === 'all' || s.agent === agentFilter;
+                const matchProject = projectFilter === 'all' || s.project === projectFilter;
                 const matchTag = tagFilter === 'all' || s.tags.includes(tagFilter);
-                return matchSearch && matchAgent && matchTag;
+                const matchStatus = statusFilter === 'all' || s.status === statusFilter;
+                const matchIgnored = ignoredFilter === 'all' ||
+                    (ignoredFilter === 'ignored' && s.ignored) ||
+                    (ignoredFilter === 'not-ignored' && !s.ignored);
+
+                return matchSearch && matchAgent && matchProject && matchTag && matchStatus && matchIgnored;
             });
 
             renderSessionList('all-sessions-list', filtered);
@@ -1211,13 +1251,21 @@
             const session = sessions.find(s => s.id === currentSessionId);
             const reason = document.getElementById('ignore-reason').value;
 
-            session.status = 'closed';
-            session.tags.push('已忽略');
+            session.ignored = true;
 
             closeModal('ignore-modal');
             renderSessions();
             addMessage(`忽略会话 "${session.title}"${reason ? ': ' + reason : ''}`, 'warning');
             showToast('会话已标记为忽略', 'success');
+        }
+
+        function cancelIgnore(id) {
+            const session = sessions.find(s => s.id === id);
+            session.ignored = false;
+
+            renderSessions();
+            addMessage(`取消忽略会话 "${session.title}"`, 'info');
+            showToast('已取消忽略', 'success');
         }
 
         // ============ Agent 配置数据 ============
@@ -1321,7 +1369,19 @@
             renderSessions();
             renderMessages();
             renderAgents();
+            initializeProjectFilter();
         });
+
+        function initializeProjectFilter() {
+            const projects = [...new Set(sessions.map(s => s.project))].sort();
+            const projectFilter = document.getElementById('project-filter');
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project;
+                option.textContent = project;
+                projectFilter.appendChild(option);
+            });
+        }
     </script>
 </body>
 </html>
