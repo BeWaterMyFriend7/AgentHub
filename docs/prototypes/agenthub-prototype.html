@@ -241,6 +241,16 @@
             border-left-color: #f44336;
         }
 
+        .message-item.user-action {
+            border-left-color: #4CAF50;
+            background: #f1f8f4;
+        }
+
+        .message-item.session-event {
+            border-left-color: #2196F3;
+            background: #f0f7ff;
+        }
+
         .message-time {
             color: #999;
             font-size: 12px;
@@ -737,19 +747,19 @@
                 <!-- 消息记录 -->
                 <div class="message-panel">
                     <div class="message-header">
-                        <div class="message-title">📝 操作记录</div>
+                        <div class="message-title">💬 消息记录</div>
                         <button class="btn btn-small" onclick="clearMessages()">🗑️ 清空</button>
                     </div>
                     <div class="message-list" id="message-list">
-                        <div class="message-item info">
+                        <div class="message-item info session-event">
                             <span class="message-time">10:23</span>
                             <span class="message-content">会话 "API优化" 状态更新为执行中</span>
                         </div>
-                        <div class="message-item">
+                        <div class="message-item user-action">
                             <span class="message-time">10:20</span>
                             <span class="message-content">标记会话 "数据库迁移" 为待测试</span>
                         </div>
-                        <div class="message-item warning">
+                        <div class="message-item warning session-event">
                             <span class="message-time">10:15</span>
                             <span class="message-content">会话 "用户认证" 等待授权</span>
                         </div>
@@ -830,12 +840,10 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>忽略:</label>
-                        <select id="ignored-filter" onchange="filterSessions()">
-                            <option value="all">全部</option>
-                            <option value="not-ignored">未忽略</option>
-                            <option value="ignored">已忽略</option>
-                        </select>
+                        <label>
+                            <input type="checkbox" id="show-ignored" onchange="filterSessions()">
+                            显示已忽略会话
+                        </label>
                     </div>
                 </div>
 
@@ -979,9 +987,9 @@
         let selectedTags = [];
         let currentSessionId = null;
         let messages = [
-            {time: '10:23', content: '会话 "API优化" 状态更新为执行中', type: 'info'},
-            {time: '10:20', content: '标记会话 "数据库迁移" 为待测试', type: 'success'},
-            {time: '10:15', content: '会话 "用户认证" 等待授权', type: 'warning'}
+            {time: '10:23', content: '会话 "API优化" 状态更新为执行中', type: 'info', source: 'session'},
+            {time: '10:20', content: '标记会话 "数据库迁移" 为待测试', type: 'success', source: 'user'},
+            {time: '10:15', content: '会话 "用户认证" 等待授权', type: 'warning', source: 'session'}
         ];
 
         // ============ 会话管理功能 ============
@@ -1081,19 +1089,21 @@
             const projectFilter = document.getElementById('project-filter').value;
             const tagFilter = document.getElementById('tag-filter').value;
             const statusFilter = document.getElementById('status-filter').value;
-            const ignoredFilter = document.getElementById('ignored-filter').value;
+            const showIgnored = document.getElementById('show-ignored').checked;
 
             let filtered = sessions.filter(s => {
+                // 默认不显示已忽略的会话，除非勾选了"显示已忽略会话"
+                if (s.ignored && !showIgnored) {
+                    return false;
+                }
+
                 const matchSearch = searchText === '' || s.title.toLowerCase().includes(searchText) || s.project.toLowerCase().includes(searchText);
                 const matchAgent = agentFilter === 'all' || s.agent === agentFilter;
                 const matchProject = projectFilter === 'all' || s.project === projectFilter;
                 const matchTag = tagFilter === 'all' || s.tags.includes(tagFilter);
                 const matchStatus = statusFilter === 'all' || s.status === statusFilter;
-                const matchIgnored = ignoredFilter === 'all' ||
-                    (ignoredFilter === 'ignored' && s.ignored) ||
-                    (ignoredFilter === 'not-ignored' && !s.ignored);
 
-                return matchSearch && matchAgent && matchProject && matchTag && matchStatus && matchIgnored;
+                return matchSearch && matchAgent && matchProject && matchTag && matchStatus;
             });
 
             renderSessionList('all-sessions-list', filtered);
@@ -1107,30 +1117,31 @@
             }, 500);
         }
 
-        // ============ 操作记录功能 ============
-        function addMessage(content, type = 'success') {
+        // ============ 消息记录功能 ============
+        function addMessage(content, type = 'success', source = 'user') {
             const now = new Date();
             const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            messages.unshift({time, content, type});
+            messages.unshift({time, content, type, source});
             if (messages.length > 20) messages.pop();
             renderMessages();
         }
 
         function renderMessages() {
             const container = document.getElementById('message-list');
-            container.innerHTML = messages.map(m =>
-                `<div class="message-item ${m.type}">
+            container.innerHTML = messages.map(m => {
+                const sourceClass = m.source === 'user' ? 'user-action' : 'session-event';
+                return `<div class="message-item ${m.type} ${sourceClass}">
                     <span class="message-time">${m.time}</span>
                     <span class="message-content">${m.content}</span>
-                </div>`
-            ).join('');
+                </div>`;
+            }).join('');
         }
 
         function clearMessages() {
-            if (confirm('确定要清空所有操作记录吗？')) {
+            if (confirm('确定要清空所有消息记录吗？')) {
                 messages = [];
                 renderMessages();
-                showToast('操作记录已清空', 'success');
+                showToast('消息记录已清空', 'success');
             }
         }
 
