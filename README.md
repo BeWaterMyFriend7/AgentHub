@@ -53,7 +53,7 @@ $env:PYTHONPATH = "$PWD\src"
 .venv\Scripts\python.exe -m agent_hub.main
 ```
 
-当前默认运行时读取 `~/.agenthub/agents.json` 中的 Agent Profile；首次运行会自动发现并展示 Codex Desktop 与 OpenCode Desktop 候选配置。Codex 直接读取本地状态并使用 Desktop 深链定位，OpenCode Desktop 直接只读本地 SQLite 并使用官方 CLI 按原生会话 ID 恢复，不需要读取 Desktop 随机生成的 Server 密码。Demo Runtime 仅保留给自动化测试使用。
+当前默认运行时读取 `~/.agenthub/agents.json` 中的 Agent Profile；首次运行会自动发现并展示 Codex Desktop、Claude Code 与 OpenCode Desktop 候选配置。Codex 直接读取本地状态并使用 Desktop 深链定位，Claude Code 读取 project JSONL 并通过 `claude --resume <session-id>` 恢复，OpenCode Desktop 直接只读本地 SQLite 并使用官方 CLI 按原生会话 ID 恢复。Demo Runtime 仅保留给自动化测试使用。
 
 启动后打开“Agent 配置”页面即可新增、编辑、启停、删除或探测 Profile。接入 OpenCode Server 时，先在启动 AgentHub 的终端设置密码环境变量，再在页面中填写该环境变量名称：
 
@@ -62,6 +62,8 @@ $env:OPENCODE_SERVER_PASSWORD = "你的 Server 密码"
 ```
 
 配置文件不会保存该密码值。会话总览支持按状态和关键字筛选，点击“打开会话”会按原生会话 ID 调用对应的 Desktop 深链或 CLI Resume。
+
+“模型与厂商”页面统一管理 Codex 与 Claude Code 的 Provider、默认模型、会话固定路由和本地代理接管。API Key 只通过环境变量读取；完整配置与恢复流程见[模型与厂商操作指南](./docs/modules/providers/user-guide.md)。
 
 ## SkillBridge 迁移状态
 

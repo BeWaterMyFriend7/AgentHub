@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AgentHub</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2319372e'/%3E%3Ctext x='12' y='42' font-size='25' fill='%23d9e890'%3EAH%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=2" />
+  <link rel="stylesheet" href="/static/styles.css?v=3" />
 </head>
 <body>
   <div class="layout">
@@ -21,6 +21,7 @@
       <nav>
         <button class="nav active" data-page="overview"><span class="nav-index">01</span>会话总览</button>
         <button class="nav" data-page="agents"><span class="nav-index">02</span>Agent 配置</button>
+        <button class="nav" data-page="providers"><span class="nav-index">03</span>模型与厂商</button>
       </nav>
 
       <div class="runtime" id="runtimeState">
@@ -113,6 +114,43 @@
         </div>
         <div class="tool-grid" id="toolGrid"></div>
       </section>
+
+      <section id="providers" class="page">
+        <header>
+          <div>
+            <p class="eyebrow">MODEL ROUTING</p>
+            <h1>模型与厂商</h1>
+            <p>统一管理 Codex、Claude Code 的默认模型、会话绑定和本地代理接管。</p>
+          </div>
+          <button class="button primary" id="addProviderBtn">新增 Provider</button>
+        </header>
+
+        <div class="profile-note">
+          <strong>凭据只保存环境变量名称。</strong>
+          AgentHub 不会把 API Key 写入 providers.json、日志或浏览器响应。
+        </div>
+
+        <section class="panel route-panel">
+          <div class="panel-head">
+            <div>
+              <h2>客户端默认路由</h2>
+              <p>默认路由影响新会话；已固定的老会话保持自己的 Provider 与模型。</p>
+            </div>
+          </div>
+          <div class="route-grid" id="routeGrid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Provider Registry</h2>
+              <p>支持 OpenAI Responses、OpenAI-compatible Chat Completions 和 Anthropic Messages。</p>
+            </div>
+            <span class="count-badge" id="providerCount">0</span>
+          </div>
+          <div class="provider-grid" id="providerGrid"></div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -134,6 +172,6 @@
   </div>
 
   <div class="toast-wrap" id="toastWrap"></div>
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

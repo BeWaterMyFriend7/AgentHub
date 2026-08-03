@@ -246,6 +246,7 @@ input:focus, select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px r
 .result-box .failure { color: var(--coral); }
 .breakable { word-break: break-all; }
 .profile-form, #dynamicFields { display: grid; gap: 13px; }
+.profile-form textarea { width: 100%; resize: vertical; border: 1px solid var(--line); padding: 10px 12px; color: var(--ink); background: var(--surface); font: inherit; }
 .form-field { display: grid; gap: 6px; }
 .form-field > span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .type-description { margin: 0; padding: 10px 12px; color: var(--muted); background: var(--soft); font-size: 11px; }
@@ -254,10 +255,22 @@ input:focus, select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px r
 .confirm-copy { padding: 4px 0; }
 .toast-wrap { position: fixed; z-index: 200; right: 18px; top: 18px; display: grid; gap: 8px; }
 .toast { width: min(380px, calc(100vw - 36px)); padding: 12px 14px; border-left: 3px solid var(--forest); color: #263a31; background: var(--surface); box-shadow: var(--shadow); font-size: 12px; }
+.route-panel { margin-bottom: 18px; }
+.route-grid, .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.route-card, .provider-card { padding: 18px; border: 1px solid var(--line); background: var(--surface); }
+.route-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.route-card h3 { margin: 3px 0 0; font-size: 18px; }
+.route-card .form-field { margin-top: 10px; }
+.integration-path, .provider-env { margin: 10px 0; color: var(--muted); font-size: 11px; word-break: break-all; }
+.provider-models { min-height: 34px; margin: 12px 0; color: #3d5148; font-size: 12px; line-height: 1.5; }
+.route-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; }
+.route-meta b { color: var(--forest); }
+.route-meta span { padding: 2px 6px; color: var(--muted); background: var(--soft); }
 
 @media (max-width: 1180px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
   .tool-grid { grid-template-columns: repeat(2, 1fr); }
+  .provider-grid { grid-template-columns: repeat(2, 1fr); }
   .session-card { grid-template-columns: 46px minmax(0, 1fr) auto; }
   .plan { grid-column: 2 / -1; }
 }
@@ -266,11 +279,12 @@ input:focus, select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px r
   .sidebar { position: static; height: auto; padding: 18px; }
   .sidebar::after, .runtime { display: none; }
   .brand { margin-bottom: 18px; }
-  nav { grid-template-columns: repeat(2, 1fr); }
+  nav { grid-template-columns: repeat(3, 1fr); }
   main { padding: 24px 14px 36px; }
   header, .session-head { flex-direction: column; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .attention-grid, .tool-grid { grid-template-columns: 1fr; }
+  .route-grid, .provider-grid { grid-template-columns: 1fr; }
   .filters { width: 100%; flex-direction: column; }
   .filters input { min-width: 0; width: 100%; }
   .session-card { grid-template-columns: 42px minmax(0, 1fr); }

@@ -6,13 +6,21 @@ import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from agent_hub.agents.models import AgentProfileInput, AgentProfilePatch
 from agent_hub.bootstrap import AgentHubRuntime, create_configured_runtime
+from agent_hub.providers.clients import ClientConfigChanged, UnsafeClientConfigPath
+from agent_hub.providers.models import (
+    ClientKind,
+    DefaultRouteInput,
+    ProviderInput,
+    SessionRouteAction,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -23,6 +31,9 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        # Register pre-existing native sessions before the gateway accepts traffic.
+        # Unknown historical routes fail closed until the user chooses a route.
+        await active_runtime.sessions.register_existing_routes()
         yield
         await active_runtime.aclose()
 
@@ -32,6 +43,18 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @application.middleware("http")
+    async def reject_cross_origin_mutations(request: Request, call_next):
+        origin = request.headers.get("origin")
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and origin:
+            expected = f"{request.url.scheme}://{request.headers.get('host', '')}"
+            if origin.rstrip("/") != expected.rstrip("/"):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "拒绝跨来源修改本地 AgentHub 状态。"},
+                )
+        return await call_next(request)
 
     @application.get("/")
     async def index() -> FileResponse:
@@ -62,6 +85,152 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     @application.get("/api/agent-types")
     async def get_agent_types():
         return active_runtime.adapter_definitions()
+
+    @application.get("/api/providers")
+    async def get_providers():
+        if active_runtime.providers is None:
+            return {"providers": [], "defaults": [], "integrations": []}
+        integrations = []
+        if active_runtime.client_integrations is not None:
+            integrations = [
+                active_runtime.client_integrations.status(client)
+                for client in ClientKind
+            ]
+        return {
+            "providers": active_runtime.providers.list_providers(),
+            "defaults": active_runtime.providers.list_default_routes(),
+            "integrations": integrations,
+        }
+
+    @application.post("/api/providers", status_code=201)
+    async def create_provider(payload: ProviderInput):
+        if active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        return active_runtime.providers.save_provider(payload)
+
+    @application.put("/api/providers/routes/{client}")
+    async def set_default_provider_route(client: ClientKind, payload: DefaultRouteInput):
+        if active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        try:
+            return active_runtime.providers.set_default_route(client, payload)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @application.put("/api/providers/{provider_id}")
+    async def update_provider(provider_id: str, payload: ProviderInput):
+        if active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        if provider_id != payload.id:
+            raise HTTPException(status_code=400, detail="路径 Provider ID 与请求体不一致。")
+        if not active_runtime.providers.has_provider(provider_id):
+            raise HTTPException(status_code=404, detail="Provider 不存在。")
+        return active_runtime.providers.save_provider(payload)
+
+    @application.delete("/api/providers/{provider_id}", status_code=204)
+    async def delete_provider(provider_id: str):
+        if active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        if not active_runtime.providers.delete_provider(provider_id):
+            raise HTTPException(status_code=404, detail="Provider 不存在。")
+
+    @application.post("/api/providers/{provider_id}/test")
+    async def test_provider(provider_id: str):
+        if active_runtime.gateway is None:
+            raise HTTPException(status_code=503, detail="Provider Gateway 未启用。")
+        try:
+            return await active_runtime.gateway.test_provider(provider_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+    @application.get("/api/clients/integrations")
+    async def get_client_integrations():
+        if active_runtime.client_integrations is None:
+            return []
+        return [active_runtime.client_integrations.status(client) for client in ClientKind]
+
+    @application.post("/api/clients/{client}/integration/enable")
+    async def enable_client_integration(client: ClientKind):
+        if active_runtime.providers is None or active_runtime.client_integrations is None:
+            raise HTTPException(status_code=503, detail="客户端配置接管未启用。")
+        try:
+            route = active_runtime.providers.resolve_route(client)
+            return active_runtime.client_integrations.enable(client, route)
+        except (ValueError, OSError, ClientConfigChanged, UnsafeClientConfigPath) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @application.post("/api/clients/{client}/integration/disable")
+    async def disable_client_integration(client: ClientKind):
+        if active_runtime.client_integrations is None:
+            raise HTTPException(status_code=503, detail="客户端配置接管未启用。")
+        try:
+            return active_runtime.client_integrations.disable(client)
+        except (ValueError, OSError, ClientConfigChanged, UnsafeClientConfigPath) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @application.put("/api/sessions/{session_id}/route")
+    async def set_session_route(session_id: str, payload: SessionRouteAction):
+        try:
+            result = await active_runtime.set_session_route(session_id, payload)
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        if result is None:
+            raise HTTPException(status_code=404, detail="没有找到该会话。")
+        return result
+
+    @application.get("/v1/models")
+    async def gateway_models():
+        if active_runtime.providers is None:
+            return {"object": "list", "data": []}
+        data = []
+        seen: set[str] = set()
+        for provider in active_runtime.providers.list_providers():
+            if not provider.enabled:
+                continue
+            for model in provider.models:
+                model_id = f"{provider.id}/{model}"
+                if model_id not in seen:
+                    data.append({"id": model_id, "object": "model", "owned_by": provider.id})
+                    seen.add(model_id)
+        for route in active_runtime.providers.list_default_routes():
+            if route.model not in seen:
+                data.append(
+                    {
+                        "id": route.model,
+                        "object": "model",
+                        "owned_by": route.provider_id,
+                    }
+                )
+                seen.add(route.model)
+        return {"object": "list", "data": data}
+
+    @application.post("/v1/responses")
+    async def gateway_responses(request: Request):
+        if active_runtime.gateway is None:
+            raise HTTPException(status_code=503, detail="Provider Gateway 未启用。")
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise ValueError("请求体必须是 JSON 对象。")
+            return await active_runtime.gateway.forward(ClientKind.CODEX, payload, request.headers)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except httpx.HTTPError as error:
+            raise HTTPException(status_code=502, detail=f"上游请求失败：{error}") from error
+
+    @application.post("/v1/messages")
+    async def gateway_messages(request: Request):
+        if active_runtime.gateway is None:
+            raise HTTPException(status_code=503, detail="Provider Gateway 未启用。")
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise ValueError("请求体必须是 JSON 对象。")
+            return await active_runtime.gateway.forward(ClientKind.CLAUDE_CODE, payload, request.headers)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except httpx.HTTPError as error:
+            raise HTTPException(status_code=502, detail=f"上游请求失败：{error}") from error
 
     @application.get("/api/agents/discover")
     async def discover_agents():
@@ -165,7 +334,7 @@ def open_browser() -> None:
 if __name__ == "__main__":
     threading.Thread(target=open_browser, daemon=True).start()
     uvicorn.run(
-        "agent_hub.main:app",
+        app,
         host="127.0.0.1",
         port=17860,
         reload=False,

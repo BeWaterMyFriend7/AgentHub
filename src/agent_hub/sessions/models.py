@@ -52,6 +52,10 @@ class AgentSession(BaseModel):
     ignored: bool = False
     follow_up: bool = False
     tags: list[str] = Field(default_factory=list)
+    provider_id: str | None = None
+    model_id: str | None = None
+    route_source: Literal["session", "default", "unbound"] = "unbound"
+    follows_default_route: bool = True
 
     @property
     def attention_required(self) -> bool:

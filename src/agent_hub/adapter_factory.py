@@ -13,6 +13,7 @@ from agent_hub.agents.models import (
     SessionIntegrationCapabilities,
 )
 from agent_hub.sessions.adapters import (
+    ClaudeCodeSessionAdapter,
     CodexSessionAdapter,
     OpenCodeDesktopSessionAdapter,
     OpenCodeSessionAdapter,
@@ -23,6 +24,18 @@ from agent_hub.sessions.adapters import (
 class AgentAdapterFactory:
     def __init__(self) -> None:
         self._definitions = {
+            "claude_code": AgentAdapterDefinition(
+                kind="claude_code",
+                agent_type="claude_code",
+                name="Claude Code",
+                description="读取 Claude Code project JSONL，并通过 CLI Session ID 精确恢复。",
+                fields=["name", "data_path", "executable"],
+                defaults={
+                    "name": "Claude Code",
+                    "data_path": str(Path.home() / ".claude" / "projects"),
+                    "executable": "claude",
+                },
+            ),
             "codex_desktop": AgentAdapterDefinition(
                 kind="codex_desktop",
                 agent_type="codex",
@@ -63,9 +76,21 @@ class AgentAdapterFactory:
         return [item.model_copy(deep=True) for item in self._definitions.values()]
 
     def default_profiles(self) -> list[AgentProfile]:
+        claude_projects = Path.home() / ".claude" / "projects"
         codex_home = Path.home() / ".codex"
         opencode_db = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
         return [
+            self.create_profile(
+                AgentProfileInput(
+                    id="claude-code",
+                    name="Claude Code",
+                    agent_type="claude_code",
+                    adapter_kind="claude_code",
+                    enabled=claude_projects.is_dir(),
+                    data_path=str(claude_projects),
+                    executable="claude",
+                )
+            ),
             self.create_profile(
                 AgentProfileInput(
                     id="codex-desktop",
@@ -100,7 +125,13 @@ class AgentAdapterFactory:
         executable = payload.executable
         username = payload.username
         secret_env = payload.secret_env
-        if payload.adapter_kind == "codex_desktop":
+        if payload.adapter_kind == "claude_code":
+            endpoint = "local://claude-code"
+            data_path = data_path or str(Path.home() / ".claude" / "projects")
+            executable = executable or "claude"
+            username = None
+            secret_env = None
+        elif payload.adapter_kind == "codex_desktop":
             endpoint = "local://codex"
             data_path = data_path or str(Path.home() / ".codex")
             executable = None
@@ -160,6 +191,12 @@ class AgentAdapterFactory:
         return self.create_profile(AgentProfileInput.model_validate(configurable))
 
     def build(self, profile: AgentProfile) -> SessionAdapter:
+        if profile.adapter_kind == "claude_code":
+            return ClaudeCodeSessionAdapter(
+                profile,
+                projects_dir=profile.data_path or None,
+                executable=profile.executable or "claude",
+            )
         if profile.adapter_kind == "codex_desktop":
             return CodexSessionAdapter(profile, codex_home=profile.data_path or None)
         if profile.adapter_kind == "opencode_desktop":
@@ -190,6 +227,19 @@ class AgentAdapterFactory:
 
     @staticmethod
     def _metadata(kind: str) -> tuple[SessionIntegrationCapabilities, str, str]:
+        if kind == "claude_code":
+            return (
+                SessionIntegrationCapabilities(
+                    session_discovery=True,
+                    status_detection=True,
+                    plan_reading=False,
+                    exact_resume=True,
+                    event_stream=False,
+                    resume_launch=True,
+                ),
+                "Claude Code project JSONL + CLI Resume",
+                "Claude Code project JSONL polling",
+            )
         if kind == "codex_desktop":
             return (
                 SessionIntegrationCapabilities(

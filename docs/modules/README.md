@@ -8,11 +8,12 @@ AgentHub 只交付一个应用，内部采用模块化单体。每个模块完�
 | --- | --- | --- |
 | [`agents/`](./agents/README.md) | 建立所有 Agent 接入的统一入口 | Agent 类型、安装、Profile、Adapter 注册和能力矩阵 |
 | [`sessions/`](./sessions/README.md) | 可靠观察并精确恢复内部会话 | 会话发现、运行状态、系统关注、用户跟进标记和精确打开 |
+| [`providers/`](./providers/README.md) | 为 Codex 与 Claude Code 提供统一模型路由 | Provider Registry、凭据引用、客户端接管、会话路由和协议网关 |
 | [`workflows/`](./workflows/README.md) | 顺序执行并跟踪跨项目任务 | 任务队列、自动推进、暂停策略、执行状态和会话定位 |
 | [`capabilities/`](./capabilities/README.md) | 统一表达可复用能力 | Skill、MCP Server、Agent 插件的发现、来源、安装和原生加载状态 |
 | [`operations/`](./operations/README.md) | 安全执行改变外部状态的操作 | 预检、共享、卸载、来源删除、备份、回滚和审计 |
 
-依赖方向保持为：`sessions` 和 `capabilities` 依赖 `agents`；`workflows` 依赖 `agents` 和 `sessions`；改变文件系统或 Agent 原生能力配置时委托 `operations`。模块之间通过稳定 Interface 协作，不复制对方的业务规则。
+依赖方向保持为：`sessions` 和 `capabilities` 依赖 `agents`；`sessions` 只读取 `providers` 暴露的会话路由视图；`workflows` 依赖 `agents` 和 `sessions`；改变文件系统或 Agent 原生能力配置时委托 `operations`。模块之间通过稳定 Interface 协作，不复制对方的业务规则。
 
 ## 模块文档
 

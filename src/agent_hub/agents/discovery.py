@@ -44,23 +44,21 @@ class AgentDiscovery:
         candidates: list[AgentCandidate] = []
         system = platform.system()
 
-        # Claude Code Desktop - 暂时不支持，跳过
-        # Claude Code 使用不同的数据结构，需要专门的 Adapter
-
-        # Claude Code CLI
+        projects_dir = Path.home() / ".claude" / "projects"
         claude_cli = shutil.which("claude")
-        if claude_cli:
+        if claude_cli or projects_dir.is_dir():
             candidates.append(
                 AgentCandidate(
                     agent_type="claude_code",
-                    adapter_kind="claude_cli",
-                    name="Claude Code CLI",
-                    description="通过 CLI 命令行工具（暂不支持自动添加）",
-                    executable=claude_cli,
-                    confidence="low",
+                    adapter_kind="claude_code",
+                    name="Claude Code",
+                    description="读取 project JSONL，并使用 CLI 恢复原生会话",
+                    data_path=str(projects_dir),
+                    executable=claude_cli or "claude",
+                    confidence="high" if claude_cli and projects_dir.is_dir() else "medium",
                     check_details=[
-                        f"发现可执行文件: {claude_cli}",
-                        "需要手动配置具体参数"
+                        f"会话目录: {projects_dir}",
+                        f"CLI: {claude_cli or '未在 PATH 中发现'}",
                     ],
                 )
             )

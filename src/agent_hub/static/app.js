@@ -15,6 +15,7 @@ let sessions = [];
 let agents = [];
 let adapterTypes = [];
 let discoveredCandidates = [];
+let providerState = { providers: [], defaults: [], integrations: [] };
 let modalAction = null;
 
 async function api(url, options = {}) {
@@ -118,6 +119,12 @@ function sessionCard(session) {
   const percent = planPercent(session);
   const ignoredClass = session.ignored ? "ignored" : "";
   const ignoredBadge = session.ignored ? '<span class="badge ignored-badge">已忽略</span>' : "";
+  const agent = agents.find(item => item.id === session.agent_id);
+  const routable = ["codex", "claude_code"].includes(agent?.agent_type);
+  const routeLabel = session.provider_id && session.model_id
+    ? `${session.provider_id}/${session.model_id}`
+    : "未配置路由";
+  const routeMode = session.route_source === "session" ? "会话固定" : session.route_source === "default" ? "跟随默认" : "未绑定";
   return `
     <article class="session-card ${ignoredClass}">
       <div class="agent-avatar">${initials(session.agent_name)}</div>
@@ -134,10 +141,12 @@ function sessionCard(session) {
         </div>
         <p class="goal">${escapeHtml(session.current_goal || session.status_reason)}</p>
         <div class="session-meta">来源：${escapeHtml(session.status_source)} · 可信度：${escapeHtml(session.confidence)}</div>
+        ${routable ? `<div class="route-meta"><b>${escapeHtml(routeLabel)}</b><span>${routeMode}</span></div>` : ""}
         ${session.last_activity ? `<div class="activity">${escapeHtml(session.last_activity)}</div>` : ""}
       </div>
       <div class="session-actions">
         <button class="button small" data-open-session="${escapeHtml(session.id)}" ${session.resumable ? "" : "disabled"}>打开会话</button>
+        ${routable ? `<button class="button small" data-route-session="${escapeHtml(session.id)}">模型路由</button>` : ""}
         ${session.status === "interrupted" ? `
           <button class="button small primary" data-mark-complete="${escapeHtml(session.id)}">标记完成</button>
         ` : ""}
@@ -208,25 +217,232 @@ function renderAgents() {
   $("#runtimeState").innerHTML = `<b>${connected} / ${enabled} 已连接</b><span>${sessions.length} 个真实会话</span>`;
 }
 
+function providerById(providerId) {
+  return providerState.providers.find(item => item.id === providerId);
+}
+
+function defaultFor(client) {
+  return providerState.defaults.find(item => item.client === client);
+}
+
+function integrationFor(client) {
+  return providerState.integrations.find(item => item.client === client) || { active: false, changed_externally: false };
+}
+
+function providerOptions(selected = "") {
+  return providerState.providers
+    .filter(item => item.enabled)
+    .map(item => `<option value="${escapeHtml(item.id)}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.protocol)}</option>`)
+    .join("");
+}
+
+function modelOptions(providerId, selected = "") {
+  const provider = providerById(providerId);
+  return (provider?.models || []).map(model => `<option value="${escapeHtml(model)}" ${model === selected ? "selected" : ""}>${escapeHtml(model)}</option>`).join("");
+}
+
+function routeCard(client, label) {
+  const route = defaultFor(client);
+  const providerId = route?.provider_id || providerState.providers.find(item => item.enabled)?.id || "";
+  const model = route?.model || providerById(providerId)?.models?.[0] || "";
+  const integration = integrationFor(client);
+  const stateClass = integration.changed_externally ? "disconnected" : integration.active ? "connected" : "disabled";
+  const stateText = integration.changed_externally ? "配置已外部修改" : integration.active ? "代理已接管" : "尚未接管";
+  return `
+    <article class="route-card" data-client-route="${client}">
+      <div class="route-card-head">
+        <div><span class="card-kicker">CLIENT ROUTE</span><h3>${label}</h3></div>
+        <span class="connection ${stateClass}">${stateText}</span>
+      </div>
+      <label class="form-field"><span>Provider</span><select data-route-provider>${providerOptions(providerId)}</select></label>
+      <label class="form-field"><span>模型</span><select data-route-model>${modelOptions(providerId, model)}</select></label>
+      <p class="integration-path">${escapeHtml(integration.config_path || "")}</p>
+      <div class="tool-actions">
+        <button class="button small primary" data-save-route="${client}">保存默认路由</button>
+        <button class="button small" data-toggle-integration="${client}" data-active="${integration.active}">${integration.active ? "恢复原配置" : "启用客户端接管"}</button>
+      </div>
+    </article>
+  `;
+}
+
+function providerCard(provider) {
+  const models = provider.models.length ? provider.models.join(" · ") : "未声明模型";
+  return `
+    <article class="provider-card ${provider.enabled ? "" : "profile-disabled"}">
+      <div class="tool-title">
+        <div><div class="card-kicker">${escapeHtml(provider.protocol)}</div><h2>${escapeHtml(provider.name)}</h2></div>
+        <span class="connection ${provider.credential_available || !provider.secret_env ? "connected" : "disconnected"}">${provider.secret_env ? (provider.credential_available ? "凭据可用" : "凭据缺失") : "无需凭据"}</span>
+      </div>
+      <div class="target" title="${escapeHtml(provider.base_url)}">${escapeHtml(provider.base_url)}</div>
+      <p class="provider-models">${escapeHtml(models)}</p>
+      <div class="provider-env">环境变量：${escapeHtml(provider.secret_env || "无")}</div>
+      <div class="tool-actions">
+        <button class="button small primary" data-test-provider="${escapeHtml(provider.id)}">测试连接</button>
+        <button class="button small" data-edit-provider="${escapeHtml(provider.id)}">编辑</button>
+        <button class="button small ghost-danger" data-delete-provider="${escapeHtml(provider.id)}">删除</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderProviders() {
+  $("#routeGrid").innerHTML = [
+    routeCard("codex", "Codex"),
+    routeCard("claude_code", "Claude Code"),
+  ].join("");
+  $("#providerCount").textContent = providerState.providers.length;
+  $("#providerGrid").innerHTML = providerState.providers.length
+    ? providerState.providers.map(providerCard).join("")
+    : '<div class="empty">尚未添加 Provider。先新增厂商，再为 Codex 或 Claude Code 设置默认路由。</div>';
+}
+
 async function loadData(showToast = false) {
   try {
-    const [dashboard, types] = await Promise.all([
+    const [dashboard, types, providerPayload] = await Promise.all([
       api("/api/dashboard"),
       api("/api/agent-types"),
+      api("/api/providers"),
     ]);
     sessions = dashboard.sessions;
     agents = dashboard.agents;
     adapterTypes = types;
+    providerState = providerPayload;
     renderStats(dashboard.summary);
     renderAttention(dashboard.attention);
     const executing = sessions.filter(s => s.status === "executing");
     renderExecuting(executing);
     renderSessions();
     renderAgents();
+    renderProviders();
     if (showToast) toast("会话状态已刷新");
   } catch (error) {
     toast(error.message);
   }
+}
+
+async function saveDefaultRoute(client) {
+  const card = document.querySelector(`[data-client-route="${client}"]`);
+  const providerId = card.querySelector("[data-route-provider]").value;
+  const model = card.querySelector("[data-route-model]").value;
+  if (!providerId || !model) throw new Error("请先选择 Provider 和模型");
+  await api(`/api/providers/routes/${client}`, {
+    method: "PUT",
+    body: JSON.stringify({ provider_id: providerId, model }),
+  });
+  toast("默认模型路由已保存");
+  await loadData();
+}
+
+async function toggleClientIntegration(client, active) {
+  const action = active ? "disable" : "enable";
+  const result = await api(`/api/clients/${client}/integration/${action}`, { method: "POST" });
+  toast(result.message);
+  await loadData();
+}
+
+async function testProvider(providerId) {
+  const result = await api(`/api/providers/${encodeURIComponent(providerId)}/test`, { method: "POST" });
+  showModal(result.ok ? "Provider 连接成功" : "Provider 连接失败", `
+    <div class="result-box ${result.ok ? "success" : "error"}">
+      <strong>${escapeHtml(result.message)}</strong>
+      <p>${result.models?.length ? `发现模型：${escapeHtml(result.models.join("、"))}` : "未返回模型列表"}</p>
+    </div>
+  `, { cancel: false });
+}
+
+function openProviderForm(provider = null) {
+  showModal(provider ? "编辑 Provider" : "新增 Provider", `
+    <form id="providerForm" class="profile-form">
+      <label class="form-field"><span>Provider ID</span><input name="id" value="${escapeHtml(provider?.id || "")}" pattern="[a-z0-9](?:[a-z0-9_]|-)*" ${provider ? "readonly" : ""} required /></label>
+      <label class="form-field"><span>显示名称</span><input name="name" value="${escapeHtml(provider?.name || "")}" required /></label>
+      <label class="form-field"><span>上游协议</span><select name="protocol">
+        <option value="openai_responses" ${provider?.protocol === "openai_responses" ? "selected" : ""}>OpenAI Responses</option>
+        <option value="openai_compatible" ${provider?.protocol === "openai_compatible" ? "selected" : ""}>OpenAI-compatible Chat Completions</option>
+        <option value="anthropic" ${provider?.protocol === "anthropic" ? "selected" : ""}>Anthropic Messages</option>
+      </select></label>
+      <label class="form-field"><span>Base URL</span><input name="base_url" value="${escapeHtml(provider?.base_url || "")}" placeholder="https://api.example.com/v1" required /></label>
+      <label class="form-field"><span>API Key 环境变量名</span><input name="secret_env" value="${escapeHtml(provider?.secret_env || "")}" placeholder="PROVIDER_API_KEY" /></label>
+      <label class="form-field"><span>模型列表（每行一个）</span><textarea name="models" rows="5" placeholder="model-a\nmodel-b">${escapeHtml((provider?.models || []).join("\n"))}</textarea></label>
+      <label class="toggle-field"><input type="checkbox" name="enabled" ${provider?.enabled === false ? "" : "checked"} /><span>启用此 Provider</span></label>
+    </form>
+  `, {
+    confirmText: provider ? "保存 Provider" : "创建 Provider",
+    onConfirm: async () => saveProvider(provider),
+  });
+}
+
+async function saveProvider(existing) {
+  const form = $("#providerForm");
+  if (!form.reportValidity()) return false;
+  const data = new FormData(form);
+  const payload = {
+    id: data.get("id").trim(),
+    name: data.get("name").trim(),
+    protocol: data.get("protocol"),
+    base_url: data.get("base_url").trim(),
+    secret_env: data.get("secret_env").trim(),
+    models: data.get("models").split(/\r?\n|,/).map(item => item.trim()).filter(Boolean),
+    enabled: data.get("enabled") === "on",
+  };
+  await api(existing ? `/api/providers/${encodeURIComponent(existing.id)}` : "/api/providers", {
+    method: existing ? "PUT" : "POST",
+    body: JSON.stringify(payload),
+  });
+  toast(existing ? "Provider 已更新" : "Provider 已创建");
+  await loadData();
+  return true;
+}
+
+function confirmDeleteProvider(provider) {
+  showModal("删除 Provider", `<div class="confirm-copy">确定删除 <strong>${escapeHtml(provider.name)}</strong>？引用它的默认路由会同时失效。</div>`, {
+    confirmText: "确认删除",
+    danger: true,
+    onConfirm: async () => {
+      await api(`/api/providers/${encodeURIComponent(provider.id)}`, { method: "DELETE" });
+      toast("Provider 已删除");
+      await loadData();
+      return true;
+    },
+  });
+}
+
+function openSessionRouteForm(session) {
+  const selectedProvider = session.provider_id || providerState.providers.find(item => item.enabled)?.id || "";
+  if (!selectedProvider) {
+    toast("请先添加 Provider");
+    return;
+  }
+  showModal("设置会话模型路由", `
+    <form id="sessionRouteForm" class="profile-form">
+      <p class="type-description">${escapeHtml(session.title)}<br />旧会话默认保持当前绑定；勾选跟随默认后会移除会话级固定路由。</p>
+      <label class="form-field"><span>Provider</span><select id="sessionRouteProvider">${providerOptions(selectedProvider)}</select></label>
+      <label class="form-field"><span>模型</span><select id="sessionRouteModel">${modelOptions(selectedProvider, session.model_id || "")}</select></label>
+      <label class="toggle-field"><input id="sessionFollowDefault" type="checkbox" ${session.follows_default_route ? "checked" : ""} /><span>从下一轮开始跟随客户端默认路由</span></label>
+    </form>
+  `, {
+    confirmText: "保存会话路由",
+    onConfirm: async () => {
+      const followDefault = $("#sessionFollowDefault").checked;
+      await api(`/api/sessions/${encodeURIComponent(session.id)}/route`, {
+        method: "PUT",
+        body: JSON.stringify({
+          follow_default: followDefault,
+          provider_id: followDefault ? null : $("#sessionRouteProvider").value,
+          model: followDefault ? null : $("#sessionRouteModel").value,
+        }),
+      });
+      toast("会话路由已更新");
+      await loadData();
+      return true;
+    },
+  });
+  $("#sessionRouteProvider").addEventListener("change", event => {
+    $("#sessionRouteModel").innerHTML = modelOptions(event.target.value);
+    $("#sessionFollowDefault").checked = false;
+  });
+  $("#sessionRouteModel").addEventListener("change", () => {
+    $("#sessionFollowDefault").checked = false;
+  });
 }
 
 async function discoverAgents() {
@@ -488,6 +704,29 @@ document.addEventListener("click", event => {
   }
   const ignore = event.target.closest("[data-mark-complete]");
   if (ignore) markSessionComplete(ignore.dataset.markComplete);
+  const routeSession = event.target.closest("[data-route-session]");
+  if (routeSession) openSessionRouteForm(sessions.find(item => item.id === routeSession.dataset.routeSession));
+  const saveRoute = event.target.closest("[data-save-route]");
+  if (saveRoute) saveDefaultRoute(saveRoute.dataset.saveRoute).catch(error => toast(error.message));
+  const integration = event.target.closest("[data-toggle-integration]");
+  if (integration) toggleClientIntegration(
+    integration.dataset.toggleIntegration,
+    integration.dataset.active === "true",
+  ).catch(error => toast(error.message));
+  const test = event.target.closest("[data-test-provider]");
+  if (test) testProvider(test.dataset.testProvider).catch(error => toast(error.message));
+  const editProvider = event.target.closest("[data-edit-provider]");
+  if (editProvider) openProviderForm(providerById(editProvider.dataset.editProvider));
+  const deleteProvider = event.target.closest("[data-delete-provider]");
+  if (deleteProvider) confirmDeleteProvider(providerById(deleteProvider.dataset.deleteProvider));
+});
+
+document.addEventListener("change", event => {
+  const providerSelect = event.target.closest("[data-route-provider]");
+  if (providerSelect) {
+    const card = providerSelect.closest("[data-client-route]");
+    card.querySelector("[data-route-model]").innerHTML = modelOptions(providerSelect.value);
+  }
 });
 
 $("#modalOk").addEventListener("click", async () => {
@@ -511,6 +750,7 @@ $("#showIgnored").addEventListener("change", renderSessions);
 $("#refreshBtn").addEventListener("click", () => loadData(true));
 $("#addAgentBtn").addEventListener("click", () => openProfileForm());
 $("#discoverAgentsBtn").addEventListener("click", discoverAgents);
+$("#addProviderBtn").addEventListener("click", () => openProviderForm());
 
 loadData();
 setInterval(() => loadData(false), 30000);

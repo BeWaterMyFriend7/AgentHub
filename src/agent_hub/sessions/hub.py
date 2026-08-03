@@ -4,6 +4,8 @@ import asyncio
 
 from agent_hub.agents.models import ProbeResult
 from agent_hub.agents.registry import AgentRegistry
+from agent_hub.providers.control import ProviderControl
+from agent_hub.providers.models import ClientKind, client_for_agent_type
 from agent_hub.sessions.adapters.base import SessionAdapter
 from agent_hub.sessions.annotations import SessionAnnotationStore
 from agent_hub.sessions.events import SessionEventLog
@@ -24,11 +26,13 @@ class SessionHub:
         adapters: dict[str, SessionAdapter],
         events: SessionEventLog,
         annotations: SessionAnnotationStore | None = None,
+        provider_control: ProviderControl | None = None,
     ) -> None:
         self._agents = agents
         self._adapters = dict(adapters)
         self._events = events
         self._annotations = annotations or SessionAnnotationStore()
+        self._provider_control = provider_control
 
         unknown = self._adapters.keys() - agents.profile_ids()
         if unknown:
@@ -47,12 +51,28 @@ class SessionHub:
                 self._agents.set_connection(agent_id, False, message)
                 self._events.record(title="会话读取失败", detail=message, agent_id=agent_id)
                 continue
-            # 应用注释信息到会话
+            profile = self._agents.profile_for(agent_id)
+            client = client_for_agent_type(profile.agent_type if profile else "")
+            route_views = (
+                self._provider_control.route_views_for_sessions(
+                    client,
+                    [(session.agent_id, session.native_session_id) for session in result],
+                )
+                if self._provider_control is not None and client is not None
+                else {}
+            )
+            # 应用注释信息和模型路由到会话
             for session in result:
                 annotation = self._annotations.get(session.id)
                 session.ignored = annotation.ignored
                 session.follow_up = annotation.follow_up
                 session.tags = annotation.tags
+                route = route_views.get((session.agent_id, session.native_session_id))
+                if route is not None:
+                    session.provider_id = route.provider_id
+                    session.model_id = route.model
+                    session.route_source = route.source
+                    session.follows_default_route = route.follows_default
             sessions.extend(result)
             profile = self._agents.profile_for(agent_id)
             message = (
@@ -66,6 +86,22 @@ class SessionHub:
     async def summary(self) -> SessionSummary:
         sessions = await self.list_sessions()
         return self.summarize(sessions)
+
+    async def register_existing_routes(self) -> None:
+        """Mark only sessions visible at AgentHub startup as historical."""
+        if self._provider_control is None:
+            return
+        sessions = await self.list_sessions()
+        grouped: dict[ClientKind, list[tuple[str, str]]] = {}
+        for session in sessions:
+            profile = self._agents.profile_for(session.agent_id)
+            client = client_for_agent_type(profile.agent_type if profile else "")
+            if client is not None:
+                grouped.setdefault(client, []).append(
+                    (session.agent_id, session.native_session_id)
+                )
+        for client, native_sessions in grouped.items():
+            self._provider_control.register_existing_sessions(client, native_sessions)
 
     @staticmethod
     def summarize(sessions: list[AgentSession]) -> SessionSummary:
