@@ -5,3 +5,7 @@ __pycache__/
 .coverage
 htmlcov/
 *.db
+*.egg-info/
+/ck/
+/.claude/settings.local.json
+/.claude/worktrees/
