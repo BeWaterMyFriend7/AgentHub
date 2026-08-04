@@ -35,7 +35,12 @@ class ProviderApiGatewayTests(unittest.TestCase):
             self.requests.append(request)
             body = json.loads(request.content.decode("utf-8")) if request.content else {}
             if request.url.path.endswith("/models"):
-                return httpx.Response(200, json={"data": [{"id": "model-a"}]})
+                if request.url.host == "fail.test":
+                    return httpx.Response(500, json={"error": "boom"})
+                return httpx.Response(
+                    200,
+                    json={"data": [{"id": "model-a"}, {"id": "model-b"}]},
+                )
             if request.url.path.endswith("/responses"):
                 return httpx.Response(
                     200,
@@ -357,6 +362,129 @@ class ProviderApiGatewayTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["output"][0]["content"][0]["text"], "chat-ok")
+
+    def test_create_provider_without_id_auto_detects_models_and_encrypts_key(self) -> None:
+        response = self.client.post(
+            "/api/providers",
+            json={
+                "name": "Keyed Gateway",
+                "protocol": "openai_responses",
+                "base_url": "https://upstream.test/v1",
+                "api_key": "sk-gateway-secret",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201, response.text)
+        provider = response.json()
+        self.assertEqual(provider["id"], "keyed-gateway")
+        self.assertEqual(provider["models"], ["model-a", "model-b"])
+        self.assertTrue(provider["api_key_stored"])
+        self.assertTrue(provider["credential_available"])
+        self.assertNotIn("api_key", provider)
+        self.assertNotIn("sk-gateway-secret", response.text)
+        secrets_path = self.root / ".agenthub" / "secrets.json"
+        self.assertTrue(secrets_path.is_file())
+        self.assertNotIn("sk-gateway-secret", secrets_path.read_text(encoding="utf-8"))
+
+        self.client.put(
+            "/api/providers/routes/codex",
+            json={"provider_id": "keyed-gateway", "model": "model-a"},
+        )
+        forwarded = self.client.post(
+            "/v1/responses",
+            json={"model": "client-model", "input": "hello", "stream": False},
+        )
+        self.assertEqual(forwarded.status_code, 200)
+        self.assertEqual(
+            self.requests[-1].headers["authorization"],
+            "Bearer sk-gateway-secret",
+        )
+
+    def test_model_visibility_hides_models_from_v1_models(self) -> None:
+        self._create_provider("visible", "openai_responses")
+        hidden = self.client.post(
+            "/api/providers/visible/models/visibility",
+            json={"model": "model-b", "visible": False},
+        )
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.json()["hidden_models"], ["model-b"])
+
+        model_ids = {
+            item["id"] for item in self.client.get("/v1/models").json()["data"]
+        }
+        self.assertIn("visible/model-a", model_ids)
+        self.assertNotIn("visible/model-b", model_ids)
+
+        shown = self.client.post(
+            "/api/providers/visible/models/visibility",
+            json={"model": "model-b", "visible": True},
+        )
+        self.assertEqual(shown.json()["hidden_models"], [])
+
+    def test_refresh_models_endpoint_updates_provider(self) -> None:
+        self._create_provider("refreshable", "openai_responses")
+        response = self.client.post("/api/providers/refreshable/models/refresh")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["models"], ["model-a", "model-b"])
+
+    def test_detection_failure_warns_but_provider_is_saved(self) -> None:
+        response = self.client.post(
+            "/api/providers",
+            json={
+                "name": "Broken Gateway",
+                "protocol": "openai_responses",
+                "base_url": "https://fail.test/v1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["models"], [])
+        self.assertIn("模型自动检测失败", response.json()["detection_warning"])
+
+    def test_edit_without_api_key_keeps_stored_secret(self) -> None:
+        created = self.client.post(
+            "/api/providers",
+            json={
+                "name": "Persist Key",
+                "protocol": "openai_responses",
+                "base_url": "https://upstream.test/v1",
+                "api_key": "sk-persist",
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        provider_id = created.json()["id"]
+
+        updated = self.client.put(
+            f"/api/providers/{provider_id}",
+            json={
+                "id": provider_id,
+                "name": "Persist Key Renamed",
+                "protocol": "openai_responses",
+                "base_url": "https://upstream.test/v1",
+            },
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertTrue(updated.json()["api_key_stored"])
+        self.assertTrue(updated.json()["credential_available"])
+
+    def test_delete_provider_clears_stored_secret_file_entry(self) -> None:
+        created = self.client.post(
+            "/api/providers",
+            json={
+                "name": "Temp Secret",
+                "protocol": "openai_responses",
+                "base_url": "https://upstream.test/v1",
+                "api_key": "sk-temp",
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        provider_id = created.json()["id"]
+        secrets_path = self.root / ".agenthub" / "secrets.json"
+        self.assertIn(provider_id, secrets_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(self.client.delete(f"/api/providers/{provider_id}").status_code, 204)
+        self.assertNotIn(provider_id, secrets_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

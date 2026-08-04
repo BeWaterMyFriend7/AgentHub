@@ -1,23 +1,28 @@
 from __future__ import annotations
 
+import json
 import threading
 import time
 import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from agent_hub.agents.models import AgentProfileInput, AgentProfilePatch
 from agent_hub.bootstrap import AgentHubRuntime, create_configured_runtime
+from agent_hub.operations.models import ConfirmationType
 from agent_hub.providers.clients import ClientConfigChanged, UnsafeClientConfigPath
 from agent_hub.providers.models import (
     ClientKind,
     DefaultRouteInput,
+    ModelVisibilityInput,
     ProviderInput,
     SessionRouteAction,
 )
@@ -26,8 +31,29 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
 
+class SkillPlanInput(BaseModel):
+    agent_id: str = Field(min_length=1)
+    operation_type: Literal["share", "unshare"]
+
+
+class SkillConfirmInput(BaseModel):
+    plan_id: str = Field(min_length=1)
+    confirmation_type: ConfirmationType
+
+
 def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     active_runtime = runtime or create_configured_runtime()
+
+    async def _refresh_provider_models(provider_id: str, view):
+        if active_runtime.gateway is None:
+            return view
+        try:
+            models = await active_runtime.gateway.fetch_models(provider_id)
+            refreshed = active_runtime.providers.refresh_models(provider_id, models)
+            return refreshed
+        except Exception as error:
+            view.detection_warning = f"模型自动检测失败：{error}"
+            return view
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -106,7 +132,11 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
     async def create_provider(payload: ProviderInput):
         if active_runtime.providers is None:
             raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
-        return active_runtime.providers.save_provider(payload)
+        try:
+            view = active_runtime.providers.save_provider(payload)
+            return await _refresh_provider_models(view.id, view)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @application.put("/api/providers/routes/{client}")
     async def set_default_provider_route(client: ClientKind, payload: DefaultRouteInput):
@@ -125,7 +155,46 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="路径 Provider ID 与请求体不一致。")
         if not active_runtime.providers.has_provider(provider_id):
             raise HTTPException(status_code=404, detail="Provider 不存在。")
-        return active_runtime.providers.save_provider(payload)
+        try:
+            view = active_runtime.providers.save_provider(payload)
+            return await _refresh_provider_models(view.id, view)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @application.post("/api/providers/{provider_id}/models/refresh")
+    async def refresh_provider_models(provider_id: str):
+        if active_runtime.providers is None or active_runtime.gateway is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        if not active_runtime.providers.has_provider(provider_id):
+            raise HTTPException(status_code=404, detail="Provider 不存在。")
+        return await _refresh_provider_models_by_id(provider_id)
+
+    async def _refresh_provider_models_by_id(provider_id: str):
+        if active_runtime.gateway is None or active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        try:
+            models = await active_runtime.gateway.fetch_models(provider_id)
+            return active_runtime.providers.refresh_models(provider_id, models)
+        except Exception as error:
+            raise HTTPException(status_code=400, detail=f"模型检测失败：{error}") from error
+
+    @application.post("/api/providers/{provider_id}/models/visibility")
+    async def set_provider_model_visibility(
+        provider_id: str,
+        payload: ModelVisibilityInput,
+    ):
+        if active_runtime.providers is None:
+            raise HTTPException(status_code=503, detail="Provider 控制面未启用。")
+        if not active_runtime.providers.has_provider(provider_id):
+            raise HTTPException(status_code=404, detail="Provider 不存在。")
+        try:
+            return active_runtime.providers.set_model_visibility(
+                provider_id,
+                payload.model,
+                payload.visible,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @application.delete("/api/providers/{provider_id}", status_code=204)
     async def delete_provider(provider_id: str):
@@ -188,6 +257,8 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
             if not provider.enabled:
                 continue
             for model in provider.models:
+                if model in provider.hidden_models:
+                    continue
                 model_id = f"{provider.id}/{model}"
                 if model_id not in seen:
                     data.append({"id": model_id, "object": "model", "owned_by": provider.id})
@@ -203,6 +274,41 @@ def create_app(runtime: AgentHubRuntime | None = None) -> FastAPI:
                 )
                 seen.add(route.model)
         return {"object": "list", "data": data}
+
+    @application.get("/api/skills")
+    async def get_skills():
+        if active_runtime.skill_service is None:
+            raise HTTPException(status_code=503, detail="Skill 管理未启用。")
+        return active_runtime.skill_service.matrix().model_dump(mode="json")
+
+    @application.post("/api/skills/{skill_name}/plan")
+    async def plan_skill_operation(skill_name: str, payload: SkillPlanInput):
+        if active_runtime.skill_service is None:
+            raise HTTPException(status_code=503, detail="Skill 管理未启用。")
+        try:
+            plan = active_runtime.skill_service.plan(
+                skill_name,
+                payload.agent_id,
+                share=payload.operation_type == "share",
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return {
+            **plan.model_dump(mode="json"),
+            "ready": plan.ready,
+        }
+
+    @application.post("/api/skills/confirm")
+    async def confirm_skill_operation(payload: SkillConfirmInput):
+        if active_runtime.skill_service is None:
+            raise HTTPException(status_code=503, detail="Skill 管理未启用。")
+        try:
+            return active_runtime.skill_service.confirm(
+                payload.plan_id,
+                payload.confirmation_type,
+            ).model_dump(mode="json")
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
     @application.post("/v1/responses")
     async def gateway_responses(request: Request):

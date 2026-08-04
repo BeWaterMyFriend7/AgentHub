@@ -45,17 +45,7 @@ class ProviderGateway:
         if provider is None:
             raise ValueError(f"Provider 不存在：{provider_id}")
         try:
-            response = await self._http_client().get(
-                self._endpoint(provider.base_url, "models"),
-                headers=self._upstream_headers(provider, {}),
-            )
-            response.raise_for_status()
-            payload = response.json()
-            models = [
-                str(item.get("id"))
-                for item in payload.get("data", [])
-                if isinstance(item, dict) and item.get("id")
-            ]
+            models = await self.fetch_models(provider_id)
             return ProviderHealth(
                 ok=True,
                 provider_id=provider.id,
@@ -68,6 +58,22 @@ class ProviderGateway:
                 provider_id=provider.id,
                 message=f"连接失败：{error}",
             )
+
+    async def fetch_models(self, provider_id: str) -> list[str]:
+        provider = self.control.get_provider(provider_id)
+        if provider is None:
+            raise ValueError(f"Provider 不存在：{provider_id}")
+        response = await self._http_client().get(
+            self._endpoint(provider.base_url, "models"),
+            headers=self._upstream_headers(provider, {}),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return [
+            str(item.get("id"))
+            for item in payload.get("data", [])
+            if isinstance(item, dict) and item.get("id")
+        ]
 
     async def forward(
         self,

@@ -16,6 +16,7 @@ let agents = [];
 let adapterTypes = [];
 let discoveredCandidates = [];
 let providerState = { providers: [], defaults: [], integrations: [] };
+let skillState = { capabilities: [], locations: [] };
 let modalAction = null;
 
 async function api(url, options = {}) {
@@ -238,7 +239,12 @@ function providerOptions(selected = "") {
 
 function modelOptions(providerId, selected = "") {
   const provider = providerById(providerId);
-  return (provider?.models || []).map(model => `<option value="${escapeHtml(model)}" ${model === selected ? "selected" : ""}>${escapeHtml(model)}</option>`).join("");
+  return visibleModels(provider).map(model => `<option value="${escapeHtml(model)}" ${model === selected ? "selected" : ""}>${escapeHtml(model)}</option>`).join("");
+}
+
+function visibleModels(provider) {
+  const hidden = new Set(provider?.hidden_models || []);
+  return (provider?.models || []).filter(model => !hidden.has(model));
 }
 
 function routeCard(client, label) {
@@ -265,24 +271,75 @@ function routeCard(client, label) {
   `;
 }
 
+function keyStatus(provider) {
+  if (provider.api_key_stored) return '<span class="connection connected">密钥已保存</span>';
+  if (provider.secret_env) {
+    return provider.credential_available
+      ? '<span class="connection connected">环境变量可用</span>'
+      : '<span class="connection disconnected">凭据缺失</span>';
+  }
+  return '<span class="connection disabled">无需凭据</span>';
+}
+
 function providerCard(provider) {
-  const models = provider.models.length ? provider.models.join(" · ") : "未声明模型";
+  const visible = visibleModels(provider);
+  const models = visible.length ? visible.join(" · ") : "尚未探测到模型";
+  const warning = provider.detection_warning
+    ? `<p class="detection-warning">${escapeHtml(provider.detection_warning)}</p>`
+    : "";
   return `
     <article class="provider-card ${provider.enabled ? "" : "profile-disabled"}">
       <div class="tool-title">
         <div><div class="card-kicker">${escapeHtml(provider.protocol)}</div><h2>${escapeHtml(provider.name)}</h2></div>
-        <span class="connection ${provider.credential_available || !provider.secret_env ? "connected" : "disconnected"}">${provider.secret_env ? (provider.credential_available ? "凭据可用" : "凭据缺失") : "无需凭据"}</span>
+        ${keyStatus(provider)}
       </div>
       <div class="target" title="${escapeHtml(provider.base_url)}">${escapeHtml(provider.base_url)}</div>
-      <p class="provider-models">${escapeHtml(models)}</p>
-      <div class="provider-env">环境变量：${escapeHtml(provider.secret_env || "无")}</div>
+      <p class="provider-models">${visible.length}/${provider.models.length || 0} 个模型：${escapeHtml(models)}</p>
+      ${warning}
       <div class="tool-actions">
         <button class="button small primary" data-test-provider="${escapeHtml(provider.id)}">测试连接</button>
+        <button class="button small" data-refresh-models="${escapeHtml(provider.id)}">重新检测模型</button>
         <button class="button small" data-edit-provider="${escapeHtml(provider.id)}">编辑</button>
         <button class="button small ghost-danger" data-delete-provider="${escapeHtml(provider.id)}">删除</button>
       </div>
     </article>
   `;
+}
+
+function modelCatalog() {
+  const providers = providerState.providers;
+  if (!providers.length) return '<div class="empty">暂无 Provider，新增后会自动探测模型。</div>';
+  return providers.map(provider => {
+    const all = provider.models || [];
+    const visible = visibleModels(provider);
+    const rows = all.map(model => {
+      const shown = visible.includes(model);
+      return `
+        <div class="model-row">
+          <span class="model-name">${escapeHtml(model)}</span>
+          <button class="visibility-toggle ${shown ? "on" : ""}" data-toggle-model="${escapeHtml(provider.id)}" data-model="${escapeHtml(model)}" data-visible="${shown}">
+            ${shown ? "显示中" : "已隐藏"}
+          </button>
+        </div>
+      `;
+    }).join("");
+    return `
+      <article class="model-group" data-provider-group="${escapeHtml(provider.id)}">
+        <div class="model-group-head">
+          <div>
+            <span class="card-kicker">${escapeHtml(provider.protocol)}</span>
+            <h3>${escapeHtml(provider.name)}</h3>
+          </div>
+          <span class="count-badge">${visible.length}/${all.length} 可见</span>
+          <div class="tool-actions">
+            <button class="button small" data-all-models="${escapeHtml(provider.id)}" data-visible="true">全部开启</button>
+            <button class="button small" data-all-models="${escapeHtml(provider.id)}" data-visible="false">全部关闭</button>
+          </div>
+        </div>
+        <div class="model-rows">${rows || '<div class="empty">尚未探测到模型</div>'}</div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderProviders() {
@@ -294,6 +351,8 @@ function renderProviders() {
   $("#providerGrid").innerHTML = providerState.providers.length
     ? providerState.providers.map(providerCard).join("")
     : '<div class="empty">尚未添加 Provider。先新增厂商，再为 Codex 或 Claude Code 设置默认路由。</div>';
+  const catalog = $("#modelCatalog");
+  if (catalog) catalog.innerHTML = modelCatalog();
 }
 
 async function loadData(showToast = false) {
@@ -314,6 +373,7 @@ async function loadData(showToast = false) {
     renderSessions();
     renderAgents();
     renderProviders();
+    loadSkills();
     if (showToast) toast("会话状态已刷新");
   } catch (error) {
     toast(error.message);
@@ -350,10 +410,33 @@ async function testProvider(providerId) {
   `, { cancel: false });
 }
 
+async function refreshProviderModels(providerId) {
+  await api(`/api/providers/${encodeURIComponent(providerId)}/models/refresh`, { method: "POST" });
+  toast("模型列表已重新检测");
+  await loadData();
+}
+
+async function toggleModelVisibility(providerId, model, visible) {
+  await api(`/api/providers/${encodeURIComponent(providerId)}/models/visibility`, {
+    method: "POST",
+    body: JSON.stringify({ model, visible }),
+  });
+  await loadData();
+}
+
+async function setAllModels(providerId, visible) {
+  const provider = providerById(providerId);
+  for (const model of provider?.models || []) {
+    if (visibleModels(provider).includes(model) !== visible) {
+      await toggleModelVisibility(providerId, model, visible);
+    }
+  }
+  await loadData();
+}
+
 function openProviderForm(provider = null) {
   showModal(provider ? "编辑 Provider" : "新增 Provider", `
     <form id="providerForm" class="profile-form">
-      <label class="form-field"><span>Provider ID</span><input name="id" value="${escapeHtml(provider?.id || "")}" pattern="[a-z0-9](?:[a-z0-9_]|-)*" ${provider ? "readonly" : ""} required /></label>
       <label class="form-field"><span>显示名称</span><input name="name" value="${escapeHtml(provider?.name || "")}" required /></label>
       <label class="form-field"><span>上游协议</span><select name="protocol">
         <option value="openai_responses" ${provider?.protocol === "openai_responses" ? "selected" : ""}>OpenAI Responses</option>
@@ -361,14 +444,29 @@ function openProviderForm(provider = null) {
         <option value="anthropic" ${provider?.protocol === "anthropic" ? "selected" : ""}>Anthropic Messages</option>
       </select></label>
       <label class="form-field"><span>Base URL</span><input name="base_url" value="${escapeHtml(provider?.base_url || "")}" placeholder="https://api.example.com/v1" required /></label>
-      <label class="form-field"><span>API Key 环境变量名</span><input name="secret_env" value="${escapeHtml(provider?.secret_env || "")}" placeholder="PROVIDER_API_KEY" /></label>
-      <label class="form-field"><span>模型列表（每行一个）</span><textarea name="models" rows="5" placeholder="model-a\nmodel-b">${escapeHtml((provider?.models || []).join("\n"))}</textarea></label>
+      <label class="form-field">
+        <span>API 密钥${provider?.api_key_stored ? "（已保存，留空保持不变）" : ""}</span>
+        <div class="secret-wrap">
+          <input id="providerApiKey" name="api_key" type="password" placeholder="${provider?.api_key_stored ? "已保存，留空保持不变" : "sk-…"}" autocomplete="new-password" />
+          <button type="button" class="button small" data-eye-toggle>显示</button>
+        </div>
+      </label>
       <label class="toggle-field"><input type="checkbox" name="enabled" ${provider?.enabled === false ? "" : "checked"} /><span>启用此 Provider</span></label>
+      <p class="type-description">保存时会自动请求 <code>/v1/models</code> 探测模型列表；密钥使用本机加密存储，保存后不可回显。</p>
     </form>
   `, {
     confirmText: provider ? "保存 Provider" : "创建 Provider",
     onConfirm: async () => saveProvider(provider),
   });
+  const eye = document.querySelector("[data-eye-toggle]");
+  if (eye) {
+    eye.addEventListener("click", () => {
+      const input = $("#providerApiKey");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      eye.textContent = show ? "隐藏" : "显示";
+    });
+  }
 }
 
 async function saveProvider(existing) {
@@ -376,21 +474,119 @@ async function saveProvider(existing) {
   if (!form.reportValidity()) return false;
   const data = new FormData(form);
   const payload = {
-    id: data.get("id").trim(),
     name: data.get("name").trim(),
     protocol: data.get("protocol"),
     base_url: data.get("base_url").trim(),
-    secret_env: data.get("secret_env").trim(),
-    models: data.get("models").split(/\r?\n|,/).map(item => item.trim()).filter(Boolean),
     enabled: data.get("enabled") === "on",
   };
-  await api(existing ? `/api/providers/${encodeURIComponent(existing.id)}` : "/api/providers", {
+  const apiKey = data.get("api_key").trim();
+  if (apiKey) payload.api_key = apiKey;
+  if (existing) payload.id = existing.id;
+  const result = await api(existing ? `/api/providers/${encodeURIComponent(existing.id)}` : "/api/providers", {
     method: existing ? "PUT" : "POST",
     body: JSON.stringify(payload),
   });
   toast(existing ? "Provider 已更新" : "Provider 已创建");
+  if (result.detection_warning) toast(result.detection_warning);
   await loadData();
   return true;
+}
+
+async function loadSkills() {
+  try {
+    skillState = await api("/api/skills");
+    renderSkills();
+  } catch (error) {
+    // Demo/未启用运行时不展示 Skill 页数据，不影响其他页面
+  }
+}
+
+const skillStateText = {
+  source: "来源",
+  shared: "已共享",
+  local_copy: "本地副本",
+  missing: "未安装",
+  conflict: "冲突",
+  broken_link: "断链",
+  invalid: "无效",
+  distributed_not_loaded: "已分发未加载",
+  health_check_failed: "健康检查失败",
+};
+
+function skillCard(capability) {
+  const rows = (capability.installations || []).map(install => {
+    const isSource = install.state === "source";
+    const shared = install.state === "shared";
+    const action = isSource
+      ? '<span class="badge source">来源</span>'
+      : shared
+        ? `<button class="button small" data-unshare-skill="${escapeHtml(capability.name)}" data-agent="${escapeHtml(install.agent_id)}">取消共享</button>`
+        : `<button class="button small primary" data-share-skill="${escapeHtml(capability.name)}" data-agent="${escapeHtml(install.agent_id)}">共享</button>`;
+    return `
+      <div class="skill-agent-row">
+        <span class="skill-agent-name">${escapeHtml(install.agent_name)}</span>
+        <span class="badge ${install.state}">${skillStateText[install.state] || install.state}</span>
+        ${action}
+      </div>
+    `;
+  }).join("");
+  return `
+    <article class="skill-card ${capability.identity_conflict ? "has-conflict" : ""}">
+      <div class="skill-head">
+        <div><span class="card-kicker">SKILL</span><h3>${escapeHtml(capability.name)}</h3></div>
+        ${capability.identity_conflict ? '<span class="badge conflict">身份冲突</span>' : ""}
+      </div>
+      <p class="skill-description">${escapeHtml(capability.description || "无描述")}</p>
+      <div class="skill-agent-list">${rows}</div>
+    </article>
+  `;
+}
+
+function renderSkills() {
+  const grid = $("#skillGrid");
+  if (!grid) return;
+  grid.innerHTML = (skillState.capabilities || []).length
+    ? skillState.capabilities.map(skillCard).join("")
+    : '<div class="empty">未发现 Skill。可在 Codex、Claude Code 或 OpenCode 的 skills 目录放置包含 SKILL.md 的目录。</div>';
+}
+
+async function planSkillOperation(skillName, agentId, share) {
+  const plan = await api(`/api/skills/${encodeURIComponent(skillName)}/plan`, {
+    method: "POST",
+    body: JSON.stringify({ agent_id: agentId, operation_type: share ? "share" : "unshare" }),
+  });
+  if (!plan.ready) {
+    toast(`操作被拒绝：${(plan.issues || []).map(item => item.message).join("；")}`);
+    return;
+  }
+  const warnings = (plan.impact_summary || [])
+    .map(item => `<p class="impact-warning">⚠ ${escapeHtml(item)}</p>`)
+    .join("");
+  const backupsTarget = (plan.steps || []).some(step => step.step_type === "backup_directory");
+  showModal(share ? "共享 Skill" : "取消 Skill 共享", `
+    <div class="confirm-copy">
+      <p>${share ? "将把" : "将取消"} <strong>${escapeHtml(skillName)}</strong> ${share ? "共享到" : "从"} <strong>${escapeHtml(agentId)}</strong> 的 skills 目录${share ? "" : "移除"}。</p>
+      <p class="breakable">目标：${escapeHtml(plan.request?.target_path || "")}</p>
+      ${warnings}
+      ${backupsTarget ? '<p class="impact-warning">⚠ 目标已有真实目录或本地修改，确认后将先隔离备份，再建立共享链接。</p>' : ""}
+    </div>
+  `, {
+    confirmText: share ? "确认共享" : "确认取消共享",
+    danger: !share,
+    onConfirm: async () => {
+      const result = await api("/api/skills/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          plan_id: plan.id,
+          confirmation_type: plan.confirmation_type,
+        }),
+      });
+      if (result.status !== "succeeded") throw new Error(result.message || "操作未成功");
+      toast(result.message);
+      await loadData();
+      return true;
+    },
+  });
 }
 
 function confirmDeleteProvider(provider) {
@@ -719,6 +915,20 @@ document.addEventListener("click", event => {
   if (editProvider) openProviderForm(providerById(editProvider.dataset.editProvider));
   const deleteProvider = event.target.closest("[data-delete-provider]");
   if (deleteProvider) confirmDeleteProvider(providerById(deleteProvider.dataset.deleteProvider));
+  const refreshModels = event.target.closest("[data-refresh-models]");
+  if (refreshModels) refreshProviderModels(refreshModels.dataset.refreshModels).catch(error => toast(error.message));
+  const toggleModel = event.target.closest("[data-toggle-model]");
+  if (toggleModel) toggleModelVisibility(
+    toggleModel.dataset.toggleModel,
+    toggleModel.dataset.model,
+    toggleModel.dataset.visible === "true",
+  ).catch(error => toast(error.message));
+  const allModels = event.target.closest("[data-all-models]");
+  if (allModels) setAllModels(allModels.dataset.allModels, allModels.dataset.visible === "true").catch(error => toast(error.message));
+  const shareSkill = event.target.closest("[data-share-skill]");
+  if (shareSkill) planSkillOperation(shareSkill.dataset.shareSkill, shareSkill.dataset.agent, true).catch(error => toast(error.message));
+  const unshareSkill = event.target.closest("[data-unshare-skill]");
+  if (unshareSkill) planSkillOperation(unshareSkill.dataset.unshareSkill, unshareSkill.dataset.agent, false).catch(error => toast(error.message));
 });
 
 document.addEventListener("change", event => {
@@ -751,6 +961,11 @@ $("#refreshBtn").addEventListener("click", () => loadData(true));
 $("#addAgentBtn").addEventListener("click", () => openProfileForm());
 $("#discoverAgentsBtn").addEventListener("click", discoverAgents);
 $("#addProviderBtn").addEventListener("click", () => openProviderForm());
+$("#refreshSkillsBtn")?.addEventListener("click", async () => {
+  await loadSkills();
+  toast("Skill 状态已刷新");
+});
 
 loadData();
+loadSkills();
 setInterval(() => loadData(false), 30000);

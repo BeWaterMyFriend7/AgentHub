@@ -2,6 +2,8 @@
 
 本模块统一表达 Skill、MCP Server 和 Agent 插件的身份、来源、安装、兼容性与原生加载状态。三种类型共享公共模型，但保留各自发现方式和生命周期规则。
 
+Skill 发现、共享与取消共享已集成到 AgentHub UI（侧边栏“Skill 管理”），使用 Operations 模块的安全目录链接与备份回滚能力。
+
 - [需求](./requirements.md)
 - [设计](./design.md)
 - [测试策略](./testing.md)

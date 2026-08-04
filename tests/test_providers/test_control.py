@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import tempfile
@@ -15,6 +16,17 @@ from agent_hub.providers.models import (
     ProviderProtocol,
     SessionRouteInput,
 )
+from agent_hub.providers.registry import ProviderRegistry
+from agent_hub.providers.secrets import SecretStore
+from agent_hub.providers.session_routes import SessionRouteStore
+
+
+def _fake_protect(data: bytes) -> bytes:
+    return b"enc(" + data + b")"
+
+
+def _fake_unprotect(ciphertext: bytes) -> bytes:
+    return ciphertext[4:-1]
 
 
 class ProviderControlTests(unittest.TestCase):
@@ -66,6 +78,24 @@ class ProviderControlTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=8) as executor:
             list(executor.map(save, range(20)))
 
+        self.assertEqual(len(self.control.list_providers()), 20)
+
+    def test_concurrent_auto_id_generation_stays_unique(self) -> None:
+        def save(index: int) -> None:
+            self.control.save_provider(
+                ProviderInput(
+                    name="Same Name",
+                    protocol=ProviderProtocol.OPENAI_RESPONSES,
+                    base_url=f"https://same-{index}.test/v1",
+                    models=["model-a"],
+                )
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(save, range(20)))
+
+        provider_ids = {item.id for item in self.control.list_providers()}
+        self.assertEqual(len(provider_ids), 20)
         self.assertEqual(len(self.control.list_providers()), 20)
 
     def test_default_route_explicit_model_and_session_binding_have_clear_precedence(self) -> None:
@@ -244,6 +274,121 @@ class ProviderControlTests(unittest.TestCase):
             [("codex-desktop", "new-thread")],
         )
         self.assertEqual(new_views[("codex-desktop", "new-thread")].source, "default")
+
+    def _control_with_fake_secrets(self) -> ProviderControl:
+        root = Path(self.temporary.name)
+        store = SecretStore(
+            root / "fake-secrets.json",
+            protect=_fake_protect,
+            unprotect=_fake_unprotect,
+        )
+        return ProviderControl(
+            ProviderRegistry(self.registry_path),
+            SessionRouteStore(root / "session-routes.json"),
+            secrets=store,
+        )
+
+    def test_missing_id_is_generated_from_name_and_stays_unique(self) -> None:
+        first = self.control.save_provider(
+            ProviderInput(
+                name="OpenAI API",
+                protocol=ProviderProtocol.OPENAI_RESPONSES,
+                base_url="https://one.test/v1",
+                models=["model-a"],
+            )
+        )
+        second = self.control.save_provider(
+            ProviderInput(
+                name="OpenAI API",
+                protocol=ProviderProtocol.OPENAI_RESPONSES,
+                base_url="https://two.test/v1",
+                models=["model-a"],
+            )
+        )
+        chinese = self.control.save_provider(
+            ProviderInput(
+                name="我的 测试 提供商",
+                protocol=ProviderProtocol.OPENAI_COMPATIBLE,
+                base_url="https://three.test/v1",
+            )
+        )
+
+        self.assertEqual(first.id, "openai-api")
+        self.assertEqual(second.id, "openai-api-2")
+        self.assertEqual(chinese.id, "provider")
+
+    def test_api_key_is_encrypted_stored_and_never_returned(self) -> None:
+        control = self._control_with_fake_secrets()
+        view = control.save_provider(
+            ProviderInput(
+                name="Keyed Provider",
+                protocol=ProviderProtocol.OPENAI_RESPONSES,
+                base_url="https://keyed.test/v1",
+                api_key="sk-plain-key",
+            )
+        )
+
+        self.assertTrue(view.api_key_stored)
+        self.assertTrue(view.credential_available)
+        self.assertNotIn("sk-plain-key", view.model_dump_json())
+        self.assertNotIn("sk-plain-key", self.registry_path.read_text(encoding="utf-8"))
+        secrets_file = Path(self.temporary.name) / "fake-secrets.json"
+        content = secrets_file.read_text(encoding="utf-8")
+        self.assertNotIn("sk-plain-key", content)
+        ciphertext = base64.b64decode(
+            json.loads(content)["secrets"]["keyed-provider"]["ciphertext"]
+        )
+        self.assertEqual(ciphertext, b"enc(sk-plain-key)")
+
+    def test_stored_key_takes_precedence_over_environment_variable(self) -> None:
+        control = self._control_with_fake_secrets()
+        control.save_provider(
+            ProviderInput(
+                name="Env Provider",
+                protocol=ProviderProtocol.OPENAI_COMPATIBLE,
+                base_url="https://env.test/v1",
+                secret_env="AGENTHUB_TEST_KEY",
+                api_key="stored-key",
+            )
+        )
+        provider = control.get_provider("env-provider")
+
+        self.assertIsNotNone(provider)
+        self.assertEqual(control.credential_for(provider), "stored-key")
+
+    def test_refresh_models_and_visibility_are_persisted(self) -> None:
+        self.control.save_provider(
+            ProviderInput(
+                id="visible",
+                name="Visible",
+                protocol=ProviderProtocol.OPENAI_RESPONSES,
+                base_url="https://visible.test/v1",
+                models=["model-a", "model-b"],
+            )
+        )
+        view = self.control.set_model_visibility("visible", "model-b", False)
+        self.assertEqual(view.hidden_models, ["model-b"])
+
+        refreshed = self.control.refresh_models("visible", ["model-a", "model-c"])
+        self.assertEqual(refreshed.models, ["model-a", "model-c"])
+        self.assertEqual(refreshed.hidden_models, [])
+
+    def test_delete_provider_clears_stored_secret(self) -> None:
+        control = self._control_with_fake_secrets()
+        control.save_provider(
+            ProviderInput(
+                name="Delete Me",
+                protocol=ProviderProtocol.OPENAI_RESPONSES,
+                base_url="https://delete.test/v1",
+                api_key="sk-delete",
+            )
+        )
+        self.assertTrue(control.api_key_stored("delete-me"))
+
+        self.assertTrue(control.delete_provider("delete-me"))
+        self.assertFalse(control.api_key_stored("delete-me"))
+        secrets_file = Path(self.temporary.name) / "fake-secrets.json"
+        self.assertNotIn("delete-me", secrets_file.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

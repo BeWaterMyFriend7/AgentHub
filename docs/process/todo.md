@@ -48,7 +48,7 @@
 - [ ] 将来源迁移实现为正式 Operation，覆盖全量预检、独立确认、逐步审计、失败补偿和重新扫描。
 - [ ] 在应用服务层提供批量能力操作，但每个子操作仍独立预检、审计并返回结果。
 - [ ] 为来源删除增加依赖影响分析、独立确认和完整预检。
-- [ ] 在 AgentHub UI 中实现 Skill 管理。
+- [x] 在 AgentHub UI 中实现 Skill 管理。
 - [ ] 在统一桌面应用中提供跨平台能力目录选择；不得恢复 SkillBridge 的 Windows 专用文件浏览接口。
 - [ ] 调研 Codex、OpenCode、Claude Code 的 MCP 配置格式与生命周期。
 - [ ] 定义 MCP 敏感信息安全归一化和健康探测方案。
@@ -102,3 +102,13 @@
 - [x] 合并 Dashboard 刷新，避免统计、待处理和会话列表重复扫描同一批本地数据。
 - [x] 真实验证 Codex Desktop 与 OpenCode Desktop 各读取 100 个会话，两次扫描共 200 个 ID 全部稳定。
 - [ ] 会话跟进标记按用户要求暂缓，后续单独实现本地持久化和筛选。
+
+## 2026-08-05 Provider 体验升级与 Skill 管理 UI
+
+- [x] Provider 创建不再要求手填 ID，按名称自动生成稳定唯一 ID。
+- [x] API Key 使用 Windows DPAPI 本地加密保存；表单默认隐藏、眼睛切换显示、保存后不可回显，删除 Provider 时清除密钥。
+- [x] 新建/编辑 Provider 时自动探测 `/v1/models` 并写回模型列表，提供“重新检测模型”动作。
+- [x] 模型目录按 Provider 分组展示，支持折叠、全部开启/全部关闭与单模型可见性开关；隐藏模型不出现在目录与选择器。
+- [x] AgentHub UI 集成 Skill 管理页：Skill × Agent 状态矩阵与共享/取消共享动作，复用 capabilities 发现与 operations 备份回滚。
+- [x] Skill 共享 HTTP API：规划 → 确认 → 执行 → 可回滚，覆盖幂等共享、取消共享与错误分支测试。
+- [ ] Provider 暂停状态（含官方 Provider）已记录在 Providers 需求，暂不实现。

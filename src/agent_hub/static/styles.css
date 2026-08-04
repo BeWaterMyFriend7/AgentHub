@@ -291,3 +291,38 @@ input:focus, select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px r
   .plan, .session-card > .button { grid-column: 1 / -1; }
   .capabilities { grid-template-columns: 1fr; }
 }
+
+/* Provider 密钥与模型目录 */
+.secret-wrap { display: flex; gap: 8px; }
+.secret-wrap input { flex: 1; }
+.detection-warning { margin: 10px 0 0; padding: 8px 10px; border-left: 3px solid var(--amber); color: #6b5527; background: var(--amber-soft); font-size: 11px; line-height: 1.5; }
+.model-catalog { display: grid; gap: 14px; }
+.model-group { border: 1px solid var(--line); background: var(--surface); }
+.model-group-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.model-group-head h3 { margin: 3px 0 0; font-size: 16px; }
+.model-group-head .count-badge { margin-left: auto; }
+.model-rows { display: grid; }
+.model-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.model-row:last-child { border-bottom: 0; }
+.model-name { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.visibility-toggle { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--soft); font-size: 11px; cursor: pointer; }
+.visibility-toggle.on { color: var(--forest); border-color: var(--forest); background: var(--forest-soft); }
+
+/* Skill 管理 */
+.skill-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.skill-card { padding: 18px; border: 1px solid var(--line); background: var(--surface); }
+.skill-card.has-conflict { border-color: var(--amber); }
+.skill-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.skill-head h3 { margin: 3px 0 0; font-size: 18px; }
+.skill-description { margin: 10px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.skill-agent-list { display: grid; gap: 8px; }
+.skill-agent-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); background: var(--soft); }
+.skill-agent-name { flex: 1; color: #3d5148; font-size: 12px; font-weight: 700; }
+.badge.source { color: var(--forest); background: var(--forest-soft); }
+.badge.missing { color: var(--muted); background: var(--soft); }
+.badge.conflict, .badge.broken_link, .badge.invalid { color: var(--coral); background: var(--coral-soft); }
+.impact-warning { margin: 6px 0; color: #6b5527; font-size: 12px; }
+
+@media (max-width: 1180px) {
+  .skill-grid { grid-template-columns: 1fr; }
+}

@@ -15,6 +15,10 @@ from agent_hub.agents.models import (
     ProbeResult,
     SessionIntegrationCapabilities,
 )
+from agent_hub.capabilities.inventory import CapabilityInventory
+from agent_hub.capabilities.locations import default_capability_locations
+from agent_hub.capabilities.models import CapabilityLocation
+from agent_hub.capabilities.service import SkillShareService
 from agent_hub.demo.controller import DemoSessionController
 from agent_hub.demo.seed import events as seed_events
 from agent_hub.demo.seed import profiles as seed_profiles
@@ -31,6 +35,9 @@ from agent_hub.providers.models import (
 from agent_hub.sessions import SessionEventLog
 from agent_hub.sessions.adapters import CodexSessionAdapter, MockSessionAdapter, OpenCodeSessionAdapter
 from agent_hub.sessions.hub import SessionHub
+from agent_hub.operations.audit import InMemoryAuditLog
+from agent_hub.operations.manager import CapabilityOperationManager
+from agent_hub.platform.links import current_directory_link_adapter
 
 
 @dataclass
@@ -45,6 +52,8 @@ class AgentHubRuntime:
     providers: ProviderControl | None = None
     client_integrations: ClientIntegrationManager | None = None
     gateway: ProviderGateway | None = None
+    skill_service: SkillShareService | None = None
+    capability_locations: list[CapabilityLocation] = field(default_factory=list)
     _reload_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     async def aclose(self) -> None:
@@ -266,6 +275,7 @@ def create_configured_runtime(
     providers = ProviderControl.from_paths(
         registry_path=root / "providers.json",
         session_routes_path=root / "session-routes.json",
+        secrets_path=root / "secrets.json",
     )
     sessions = SessionHub(
         agents,
@@ -285,6 +295,19 @@ def create_configured_runtime(
         ),
     )
     gateway = ProviderGateway(providers, transport=gateway_transport)
+    link_adapter = current_directory_link_adapter()
+    capability_locations = default_capability_locations()
+    skill_service = SkillShareService(
+        CapabilityInventory(link_adapter),
+        CapabilityOperationManager(
+            link_adapter=link_adapter,
+            audit_log=InMemoryAuditLog(),
+            allowed_roots=[location.root for location in capability_locations],
+            protected_roots=[location.root for location in capability_locations],
+            backup_root=root / "backups",
+        ),
+        capability_locations,
+    )
     return AgentHubRuntime(
         agents=agents,
         sessions=sessions,
@@ -295,6 +318,8 @@ def create_configured_runtime(
         providers=providers,
         client_integrations=integrations,
         gateway=gateway,
+        skill_service=skill_service,
+        capability_locations=capability_locations,
     )
 
 

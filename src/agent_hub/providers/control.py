@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import threading
 from pathlib import Path
 
 from agent_hub.providers.models import (
@@ -16,13 +18,21 @@ from agent_hub.providers.models import (
     SessionRouteView,
 )
 from agent_hub.providers.registry import ProviderRegistry
+from agent_hub.providers.secrets import SecretStore
 from agent_hub.providers.session_routes import SessionRouteStore
 
 
 class ProviderControl:
-    def __init__(self, registry: ProviderRegistry, session_routes: SessionRouteStore) -> None:
+    def __init__(
+        self,
+        registry: ProviderRegistry,
+        session_routes: SessionRouteStore,
+        secrets: SecretStore | None = None,
+    ) -> None:
         self._registry = registry
         self._session_routes = session_routes
+        self._secrets = secrets or SecretStore(registry.path.parent / "secrets.json")
+        self._save_lock = threading.RLock()
 
     @classmethod
     def from_paths(
@@ -30,8 +40,14 @@ class ProviderControl:
         *,
         registry_path: str | Path,
         session_routes_path: str | Path,
+        secrets_path: str | Path | None = None,
     ) -> "ProviderControl":
-        return cls(ProviderRegistry(registry_path), SessionRouteStore(session_routes_path))
+        root = Path(registry_path).expanduser().parent
+        return cls(
+            ProviderRegistry(registry_path),
+            SessionRouteStore(session_routes_path),
+            SecretStore(secrets_path or root / "secrets.json"),
+        )
 
     def list_providers(self) -> list[ProviderView]:
         return [self._view(item) for item in self._registry.list_providers()]
@@ -41,11 +57,50 @@ class ProviderControl:
         return self._registry.get(provider_id)
 
     def save_provider(self, payload: ProviderInput) -> ProviderView:
-        profile = ProviderProfile.model_validate(payload.model_dump())
-        return self._view(self._registry.upsert(profile))
+        with self._save_lock:
+            values = payload.model_dump(exclude={"api_key"})
+            provider_id = values["id"] or self._generate_provider_id(values["name"])
+            values["id"] = provider_id
+            profile = ProviderProfile.model_validate(values)
+            if payload.api_key and payload.api_key.strip():
+                self._secrets.save(provider_id, payload.api_key)
+            return self._view(self._registry.upsert(profile))
 
     def delete_provider(self, provider_id: str) -> bool:
-        return self._registry.delete(provider_id)
+        deleted = self._registry.delete(provider_id)
+        if deleted:
+            self._secrets.delete(provider_id)
+        return deleted
+
+    def api_key_stored(self, provider_id: str) -> bool:
+        return self._secrets.has(provider_id)
+
+    def refresh_models(self, provider_id: str, models: list[str]) -> ProviderView:
+        provider = self._require_provider(provider_id)
+        updated = provider.model_copy(
+            update={
+                "models": models,
+                "hidden_models": [
+                    model for model in provider.hidden_models if model in models
+                ],
+            }
+        )
+        return self._view(self._registry.upsert(updated))
+
+    def set_model_visibility(
+        self,
+        provider_id: str,
+        model: str,
+        visible: bool,
+    ) -> ProviderView:
+        provider = self._require_provider(provider_id)
+        hidden = set(provider.hidden_models)
+        if visible:
+            hidden.discard(model)
+        elif model in provider.models:
+            hidden.add(model)
+        updated = provider.model_copy(update={"hidden_models": sorted(hidden)})
+        return self._view(self._registry.upsert(updated))
 
     def has_provider(self, provider_id: str) -> bool:
         return self._registry.get(provider_id) is not None
@@ -255,6 +310,9 @@ class ProviderControl:
         )
 
     def credential_for(self, provider: ProviderProfile) -> str | None:
+        stored = self._secrets.get(provider.id)
+        if stored:
+            return stored
         return os.environ.get(provider.secret_env) if provider.secret_env else None
 
     def find_session_route(
@@ -310,6 +368,17 @@ class ProviderControl:
 
     def _view(self, provider: ProviderProfile) -> ProviderView:
         return ProviderView(
-            **provider.model_dump(),
+            **provider.model_dump(exclude={"api_key"}),
             credential_available=bool(self.credential_for(provider)),
+            api_key_stored=self._secrets.has(provider.id),
         )
+
+    def _generate_provider_id(self, name: str) -> str:
+        base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "provider"
+        existing = {item.id for item in self._registry.list_providers()}
+        candidate = base
+        suffix = 2
+        while candidate in existing:
+            candidate = f"{base}-{suffix}"
+            suffix += 1
+        return candidate

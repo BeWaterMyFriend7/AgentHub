@@ -29,7 +29,9 @@ class ProviderRegistry:
                     break
             else:
                 providers.append(provider)
-            payload["providers"] = [item.model_dump(mode="json") for item in providers]
+            payload["providers"] = [
+                item.model_dump(mode="json", exclude={"api_key"}) for item in providers
+            ]
             self._write(payload)
         return provider
 

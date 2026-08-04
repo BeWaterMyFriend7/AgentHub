@@ -29,12 +29,14 @@ class ProviderProtocol(StrEnum):
 
 
 class ProviderInput(BaseModel):
-    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    id: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=1, max_length=120)
     protocol: ProviderProtocol
     base_url: str
     secret_env: str = ""
+    api_key: str | None = None
     models: list[str] = Field(default_factory=list)
+    hidden_models: list[str] = Field(default_factory=list)
     enabled: bool = True
 
     @field_validator("base_url")
@@ -56,13 +58,25 @@ class ProviderInput(BaseModel):
                 result.append(model)
         return result
 
+    @field_validator("hidden_models")
+    @classmethod
+    def normalize_hidden_models(cls, values: list[str]) -> list[str]:
+        result: list[str] = []
+        for value in values:
+            model = value.strip()
+            if model and model not in result:
+                result.append(model)
+        return result
+
 
 class ProviderProfile(ProviderInput):
-    pass
+    api_key: str | None = Field(default=None, exclude=True)
 
 
 class ProviderView(ProviderProfile):
     credential_available: bool = False
+    api_key_stored: bool = False
+    detection_warning: str | None = None
 
 
 class DefaultRouteInput(BaseModel):
@@ -86,6 +100,11 @@ class SessionRouteAction(BaseModel):
     provider_id: str | None = None
     model: str | None = None
     follow_default: bool = False
+
+
+class ModelVisibilityInput(BaseModel):
+    model: str = Field(min_length=1)
+    visible: bool
 
 
 class SessionRoute(SessionRouteInput):
